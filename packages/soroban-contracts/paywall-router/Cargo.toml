@@ -1,0 +1,21 @@
+[package]
+name = "paywall-router"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk.workspace = true
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+agent-registry = { path = "../agent-registry", features = ["testutils"] }
+paid-call-ledger = { path = "../paid-call-ledger", features = ["testutils"] }
+
+[features]
+testutils = ["soroban-sdk/testutils"]

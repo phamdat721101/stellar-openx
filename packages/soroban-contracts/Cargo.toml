@@ -1,0 +1,38 @@
+# Soroban workspace — four production contracts for OpenX-S
+#
+# - agent-registry   : agent listings + KYA replacement
+# - paywall-router   : x402-on-Stellar payment dispatch (95/5 USDC split)
+# - paid-call-ledger : per-call revenue accumulator + dispute / refund
+# - privacy-pool     : Nethermind fork — optional Privacy Pool premium tier
+#
+# Build:  cargo build --release --target wasm32-unknown-unknown
+# Test :  cargo test --workspace
+
+[workspace]
+resolver = "2"
+members = [
+    "agent-registry",
+    "paywall-router",
+    "paid-call-ledger",
+    "privacy-pool",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Pham Nim <pham@openx.so>"]
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+soroban-sdk = "22.0.8"
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true

@@ -1,0 +1,17 @@
+{
+  "name": "@openx/sdk",
+  "version": "3.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^13.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

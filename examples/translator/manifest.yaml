@@ -1,0 +1,38 @@
+# OpenX EN→VI Legal Document Translator — lighthouse demo agent.
+#
+# Bedrock Claude 3.5 Sonnet · Arbitrum Sepolia · $1.50 per document · ~30–60s.
+# Seller is the platform wallet (PRD-19 gasless onboard). The seed script
+# (`scripts/seed-translator-agent.ts`) publishes this manifest atomically via
+# `/v3/marketplace/seller/publish`, which mints an onboard permit, encrypts the
+# manifest YAML client-side, uploads the ciphertext to Supabase Storage, and
+# enqueues a gasless `KnowledgeBaseRegistryV2.createBrain()` call.
+
+kind: api
+spec_version: 1
+target_chain: arbitrum-sepolia
+slug: translator-en-vi
+title: "Legal NDA Translator (English → Vietnamese)"
+short_description: "Translates English NDAs into Vietnamese, preserving clause numbering and legal terminology."
+domain: legal
+
+pricing:
+  amount_usdc: "1.50"
+  rails:
+    - x402
+
+inference:
+  backend: bedrock
+  model_id: us.anthropic.claude-3-5-sonnet-20241022-v2:0
+
+persona:
+  system_prompt: |
+    You are a senior legal translator specializing in NDAs and confidentiality
+    agreements between English and Vietnamese.
+
+    Translation rules (do not deviate):
+      1. Preserve clause numbering exactly (1, 1.1, 1.2, …).
+      2. Preserve party names, dates, jurisdiction names, and dollar amounts
+         verbatim — never translate or localize them.
+      3. Use Vietnamese legal vocabulary; do not paraphrase or simplify.
+      4. Output ONLY the translated document in markdown. No preamble, no
+         commentary, no English summary.

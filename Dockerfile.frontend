@@ -1,0 +1,23 @@
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json* ./
+COPY packages/sdk/package.json packages/sdk/
+COPY packages/frontend/package.json packages/frontend/
+RUN npm install --workspace=@openx/sdk --workspace=@openx/frontend --ignore-scripts
+
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY packages/sdk packages/sdk
+COPY packages/frontend packages/frontend
+RUN npm run sdk:build && npm run frontend:build
+
+FROM node:20-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/packages/frontend/.next ./packages/frontend/.next
+COPY --from=build /app/packages/frontend/package.json ./packages/frontend/
+COPY --from=build /app/node_modules ./node_modules
+EXPOSE 3000
+WORKDIR /app/packages/frontend
+CMD ["npm", "run", "start"]

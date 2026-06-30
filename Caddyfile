@@ -1,0 +1,12 @@
+{
+	# Set $ACME_EMAIL in env for Let's Encrypt staging→production prompts.
+	email {$ACME_EMAIL:ops@openx.so}
+}
+
+# Reachable as https://api.18-143-233-99.sslip.io. sslip.io resolves
+# 18-143-233-99 → 18.143.233.99, so Caddy + Let's Encrypt issue a valid
+# cert with no DNS provisioning needed.
+api.18-143-233-99.sslip.io {
+	encode zstd gzip
+	reverse_proxy api:3001
+}

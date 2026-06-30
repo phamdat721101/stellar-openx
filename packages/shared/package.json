@@ -1,0 +1,6 @@
+{
+  "name": "@openx/migrations",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Postgres migrations applied in lexical order by `npm run db:migrate`."
+}

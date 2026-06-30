@@ -1,0 +1,232 @@
+# =============================================================================
+# Dependencies
+# =============================================================================
+node_modules/
+jspm_packages/
+.pnpm-store/
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+logo/
+new-home/
+
+# =============================================================================
+# Build & compile outputs
+# =============================================================================
+dist/
+build/
+out/
+lib-cov/
+.next/
+.turbo/
+.swc/
+.vercel/
+.parcel-cache/
+.cache/
+.eslintcache
+.stylelintcache
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Hardhat / Foundry / Solidity
+artifacts/
+cache/
+cache_hardhat/
+forge-cache/
+broadcast/
+typechain/
+typechain-types/
+
+# Move / Sui builds
+packages/sui-contracts/build/
+
+# Rust / Soroban (cargo target dirs land in every workspace member)
+target/
+**/target/
+*.rlib
+*.rmeta
+# Built Soroban contracts — wasm binaries land under target/; this also
+# guards against accidentally committing copied artifacts at the repo root.
+*.wasm
+
+# Soroban / Stellar CLI local state
+.soroban/
+.stellar/
+.contractbindings/
+
+# Test / coverage outputs
+coverage/
+*.lcov
+lcov.info
+.nyc_output/
+
+# Native compiled
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.node
+build/Release/
+
+# Generated source maps that aren't intentionally shipped
+*.js.map.bak
+
+# =============================================================================
+# Environment & secrets (NEVER commit)
+# =============================================================================
+.env
+.env.*
+!.env.example
+!.env.*.example
+packages/*/.env
+packages/*/.env.*
+!packages/*/.env.example
+
+# Private keys / certificates / keystores
+*.pem
+*.key
+*.p12
+*.pfx
+*.pkcs12
+*.keystore
+*.crt
+*.cer
+*.der
+
+# SSH keys
+id_rsa
+id_rsa.*
+id_dsa
+id_dsa.*
+id_ecdsa
+id_ecdsa.*
+id_ed25519
+id_ed25519.*
+*.ppk
+
+# GPG / PGP
+*.gpg
+secring.*
+
+# Wallets / mnemonics
+wallet.json
+wallets/
+keystore/
+*.mnemonic
+*.seed
+
+# Generic credential containers
+secrets/
+credentials/
+private/
+
+# Cloud-provider credential files
+.aws/
+aws-credentials.json
+aws.credentials
+*.aws.json
+.gcloud/
+gcloud-credentials.json
+service-account*.json
+serviceAccount*.json
+credentials.json
+*-credentials.json
+*.credentials
+
+# API-key / token dumps
+apikey.json
+apikeys.json
+api-keys.json
+*.token
+*.passwd
+
+# Environment-file backups (leaked secrets risk)
+.env.bak
+.env.*.bak
+.env.local.bak.*
+.env.*.bak.*
+
+# =============================================================================
+# Deployment records & local-only state
+# =============================================================================
+deployments/
+.deploy/
+.deployment
+
+# =============================================================================
+# Logs & runtime
+# =============================================================================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Process IDs
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# =============================================================================
+# OS files
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =============================================================================
+# IDE / editor
+# =============================================================================
+.idea/
+.vscode/
+.vscode-test/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+.history/
+
+# Agent / tool caches
+.claude/
+
+# =============================================================================
+# Design assets (large, reference-only)
+# =============================================================================
+new-ui/
+fhe-pay/
+
+# =============================================================================
+# Package locks (keep root only — workspace-managed)
+# =============================================================================
+packages/*/package-lock.json
+packages/*/yarn.lock
+packages/*/pnpm-lock.yaml
+
+# =============================================================================
+# Internal docs (un-shipped working notes — top-level only).
+# Anchored with leading slash so it matches /docs/ at the repo root, NOT
+# every nested `docs/` directory (e.g. packages/frontend/src/app/docs/).
+# =============================================================================
+/docs/
+
+# =============================================================================
+# Misc archives & temp
+# =============================================================================
+*.tgz
+*.tar
+*.zip.tmp
+*.bak
+*.tmp
+*~

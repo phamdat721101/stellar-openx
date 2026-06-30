@@ -1,0 +1,43 @@
+{
+  "name": "stellar-openx",
+  "version": "3.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/api",
+    "packages/frontend",
+    "packages/sdk",
+    "packages/shared"
+  ],
+  "scripts": {
+    "sdk:build": "npm run build -w packages/sdk",
+    "api:dev": "npm run dev -w packages/api",
+    "api:build": "npm run build -w packages/api",
+    "api:start": "npm run start -w packages/api",
+    "frontend:dev": "npm run dev -w packages/frontend",
+    "frontend:build": "npm run build -w packages/frontend",
+    "frontend:start": "npm run start -w packages/frontend",
+    "soroban:build": "cargo build --release --target wasm32-unknown-unknown --manifest-path packages/soroban-contracts/Cargo.toml",
+    "soroban:test": "cargo test --manifest-path packages/soroban-contracts/Cargo.toml",
+    "soroban:deploy": "bash scripts/deploy-soroban.sh all testnet",
+    "build": "npm run sdk:build && npm run api:build && npm run frontend:build",
+    "dev": "./scripts/start-dev.sh",
+    "docker:up": "docker compose up -d",
+    "docker:build": "docker compose build --parallel",
+    "deploy": "./scripts/deploy.sh",
+    "smoke:stellar-marketplace": "tsx scripts/smoke-stellar-marketplace-e2e.ts",
+    "smoke:stellar-privacy-pool": "tsx scripts/smoke-stellar-privacy-pool-e2e.ts",
+    "smoke:coinflow-stellar": "tsx scripts/smoke-coinflow-stellar-e2e.ts",
+    "smoke:translator-e2e": "tsx scripts/smoke-translator-e2e.ts",
+    "smoke:credit-e2e": "tsx scripts/smoke-credit-e2e.ts",
+    "smoke:all": "bash scripts/run-all-smokes.sh",
+    "seed:translator": "tsx scripts/seed-translator-agent.ts",
+    "db:migrate": "bash -c 'for f in packages/shared/migrations/*.sql; do psql \"$DATABASE_URL\" -f \"$f\" || true; done'",
+    "start": "./scripts/start.sh",
+    "start:api": "./scripts/start.sh --api",
+    "start:frontend": "./scripts/start.sh --frontend"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.4.0"
+  }
+}
