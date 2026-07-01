@@ -63,6 +63,10 @@ app.get('/platform', (_req, res) =>
       paywallRouter: process.env.STELLAR_PAYWALL_ROUTER_ID ?? '',
       paidCallLedger: process.env.STELLAR_PAID_CALL_LEDGER_ID ?? '',
       privacyPool: process.env.STELLAR_PRIVACY_POOL_ID ?? '',
+      privacyPoolToken: process.env.STELLAR_PRIVACY_POOL_TOKEN_ID ?? '',
+      aspMembership: process.env.STELLAR_ASP_MEMBERSHIP_ID ?? '',
+      aspNonMembership: process.env.STELLAR_ASP_NON_MEMBERSHIP_ID ?? '',
+      groth16Verifier: process.env.STELLAR_GROTH16_VERIFIER_ID ?? '',
     },
   }),
 );

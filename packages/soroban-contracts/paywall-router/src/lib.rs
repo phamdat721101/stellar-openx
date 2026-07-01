@@ -144,15 +144,20 @@ impl PaywallRouter {
         }
         LedgerClient::new(&env, &ledger).accrue(&agent_id, &seller_share);
 
-        // Deterministic 32-byte call id: 4 bytes count || 8 bytes ts || query_hash[..20].
+        // Deterministic 32-byte call id: 4 bytes count || 28 bytes query_hash.
+        //
+        // Excluding `ledger().timestamp()` is required for the same
+        // footprint reason as agent-registry: sim-time ts ≠ exec-time ts
+        // would derive a different `Call(call_id)` key and trap.
+        // `count` is monotonic; `query_hash` is buyer-provided and
+        // deterministic, so the call id still correlates the on-chain
+        // record with the buyer's off-chain query.
         let ts = env.ledger().timestamp();
         let count: u32 = env.storage().instance().get(&DataKey::CallCount).unwrap_or(0);
+        let qh = query_hash.to_array();
         let mut bytes = [0u8; 32];
         bytes[..4].copy_from_slice(&count.to_be_bytes());
-        bytes[4..12].copy_from_slice(&ts.to_be_bytes());
-        // Splice first 20 bytes of query_hash to keep call_id correlated with the user's intent.
-        let qh = query_hash.to_array();
-        bytes[12..].copy_from_slice(&qh[..20]);
+        bytes[4..].copy_from_slice(&qh[..28]);
         let call_id: BytesN<32> = BytesN::from_array(&env, &bytes);
         env.storage().instance().set(&DataKey::CallCount, &(count + 1));
 

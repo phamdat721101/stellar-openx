@@ -5,9 +5,11 @@ import type { PaymentMode } from '@openx/sdk';
 
 /**
  * useConnectedPrivacyMode — owns the public/private tier choice for hire
- * actions. Default is `public`; the user flips it via `PrivacyModeToggle`.
+ * actions. v3.1 makes `'private'` the default so every buyer→agent USDC
+ * payment routes through the ZK Privacy Pool envelope unless the buyer
+ * explicitly downgrades to public via `PrivacyModeToggle`.
  */
 export function useConnectedPrivacyMode() {
-  const [mode, setMode] = useState<PaymentMode>('public');
+  const [mode, setMode] = useState<PaymentMode>('private');
   return { mode, setMode };
 }

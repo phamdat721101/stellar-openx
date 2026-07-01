@@ -1,6 +1,6 @@
 {
   "name": "@openx/sdk",
-  "version": "3.0.0",
+  "version": "3.2.0",
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,9 +9,12 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "^13.3.0"
+    "@stellar/stellar-sdk": "^15.1.0",
+    "js-sha3": "^0.9.3",
+    "snarkjs": "^0.7.5"
   },
   "devDependencies": {
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "@types/snarkjs": "^0.7.9"
   }
 }

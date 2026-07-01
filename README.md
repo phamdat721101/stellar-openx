@@ -12,7 +12,7 @@
 | **Settlement** | USDC on Stellar (Stellar Asset Contract) |
 | **Wallet** | [Stellar Wallets Kit](https://github.com/Creit-Tech/Stellar-Wallets-Kit) — Freighter / LOBSTR / Albedo / xBull / Rabet |
 | **Onramp** | Coinflow Stellar SEP-24 (SEPA · Card · Apple Pay) |
-| **Privacy tier** | Privacy Pool (Nethermind fork) with Groth16 proof verification |
+| **Privacy tier** | Privacy Pool (Nethermind audited external deployment) with Groth16 proof verification — see [docs/runbooks/ZK_DEPLOY.md](docs/runbooks/ZK_DEPLOY.md) |
 | **License** | MIT |
 
 ---
@@ -54,7 +54,7 @@ Supabase Postgres (agents · paid_calls · knowledge_chunks · buyer_credits)
 | `agent-registry` | Agent listings + metadata (slug, persona hash, price, seller payout) |
 | `paywall-router` | Buyer-side x402 entry. 95 % seller / 5 % platform USDC split |
 | `paid-call-ledger` | Per-agent revenue accumulator. Sellers withdraw on demand |
-| `privacy-pool` | Optional Privacy Pool premium tier (Nethermind fork) |
+| _(external)_ `pool + asp-{membership,non-membership} + verifier` | Nethermind's audited Privacy Pool premium tier (v3.2). Consumed as external cross-contracts; addresses pinned via `bash scripts/deploy-privacy-pool.sh testnet` |
 
 Build: `npm run soroban:build` · Test: `npm run soroban:test` · Deploy: `npm run soroban:deploy`.
 

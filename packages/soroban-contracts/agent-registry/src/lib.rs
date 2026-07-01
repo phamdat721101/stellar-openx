@@ -73,15 +73,22 @@ impl AgentRegistry {
         if price_stroops < 0 {
             panic_with_error!(&env, Error::InvalidPrice);
         }
-        let ts = env.ledger().timestamp();
         let count: u32 = env.storage().instance().get(&DataKey::Count).unwrap_or(0);
-        // Deterministic 32-byte id: 4 bytes count || 8 bytes ts || 20 zero pad.
-        // Avoids keccak256 host-fn complexity for v3.0.0; collisions are
-        // impossible because `count` is monotonically incremented.
+        // Deterministic 32-byte id: 4 bytes count || 28 zero pad.
+        //
+        // We DO NOT mix `ledger().timestamp()` into the id any more —
+        // Soroban tx footprints are declared during simulation, but
+        // `ts` at exec-time differs from sim-time, so the derived
+        // storage key `Agent(agent_id)` falls outside the footprint and
+        // the host traps with "data key outside of the footprint".
+        // `count` is monotonic per-contract-instance, so collisions are
+        // impossible. The original creation timestamp lives in the
+        // `created_at` metadata field for audit.
         let mut bytes = [0u8; 32];
         bytes[..4].copy_from_slice(&count.to_be_bytes());
-        bytes[4..12].copy_from_slice(&ts.to_be_bytes());
         let agent_id: BytesN<32> = BytesN::from_array(&env, &bytes);
+
+        let ts = env.ledger().timestamp();
 
         let metadata = AgentMetadata {
             schema_version: 1,

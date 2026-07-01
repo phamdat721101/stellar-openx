@@ -9,6 +9,7 @@ import {
   TransactionBuilder,
   TimeoutInfinite,
   type Transaction,
+  type xdr,
 } from '@stellar/stellar-sdk';
 import { STELLAR_NETWORK, STELLAR_RPC_URLS, STELLAR_USDC_SAC, type StellarNetwork } from '@openx/sdk';
 
@@ -23,9 +24,17 @@ export interface StellarHandle {
     paywallRouter: string;
     paidCallLedger: string;
     privacyPool: string;
+    privacyPoolToken: string;
+    aspMembership: string;
+    aspNonMembership: string;
     groth16Verifier: string;
   };
-  submitPlatformSigned(tx: Transaction): Promise<{ hash: string; ledger?: number }>;
+  submitPlatformSigned(tx: Transaction): Promise<{
+    hash: string;
+    ledger?: number;
+    /** ScVal returned by the invoked contract method; undefined for non-invoke ops. */
+    returnValue?: xdr.ScVal;
+  }>;
   buildTx(source: string): Promise<TransactionBuilder>;
 }
 
@@ -47,6 +56,9 @@ export function getStellar(): StellarHandle {
     paywallRouter: requireEnv('STELLAR_PAYWALL_ROUTER_ID'),
     paidCallLedger: requireEnv('STELLAR_PAID_CALL_LEDGER_ID'),
     privacyPool: process.env.STELLAR_PRIVACY_POOL_ID ?? '',
+    privacyPoolToken: process.env.STELLAR_PRIVACY_POOL_TOKEN_ID ?? '',
+    aspMembership: process.env.STELLAR_ASP_MEMBERSHIP_ID ?? '',
+    aspNonMembership: process.env.STELLAR_ASP_NON_MEMBERSHIP_ID ?? '',
     groth16Verifier: process.env.STELLAR_GROTH16_VERIFIER_ID ?? '',
   };
 
@@ -56,7 +68,9 @@ export function getStellar(): StellarHandle {
     let attempt = 0;
     while (attempt < 30) {
       const r = await stellarRpc.getTransaction(send.hash);
-      if (r.status === 'SUCCESS') return { hash: send.hash, ledger: r.ledger };
+      if (r.status === 'SUCCESS') {
+        return { hash: send.hash, ledger: r.ledger, returnValue: r.returnValue };
+      }
       if (r.status === 'FAILED') throw new Error(`stellar:tx:failed:${send.hash}`);
       await new Promise((res) => setTimeout(res, 1_000));
       attempt += 1;

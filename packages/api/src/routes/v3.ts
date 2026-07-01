@@ -72,11 +72,14 @@ router.get('/agents/slug-available', async (req, res) => {
 
 router.get('/agents/:id/recent-calls', async (req, res) => {
   const limit = Math.min(Number(req.query.limit ?? 10), 50);
+  // Hide legacy `method='demo'` rows produced by the v3.0 gate bypass — they
+  // are kept in `paid_calls` for audit but should not pollute the live
+  // buyer-facing feed now that the bypass is gone.
   const r = await pool.query(
     `SELECT created_at, amount_usdc, method, tx_hash,
             SUBSTRING(buyer, 1, 6) || '…' || SUBSTRING(buyer, GREATEST(LENGTH(buyer) - 3, 1)) AS buyer_anon
        FROM paid_calls
-      WHERE agent_id = $1
+      WHERE agent_id = $1 AND method <> 'demo'
    ORDER BY created_at DESC
       LIMIT $2`,
     [req.params.id, limit],

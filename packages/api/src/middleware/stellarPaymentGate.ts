@@ -29,7 +29,8 @@ import { pool } from '../db';
 import { logger } from '../lib';
 import * as ledger from '../services/paidCallLedger';
 import { getStellar } from '../services/stellar/client';
-import { usdcToStroops, type PaymentMode, type StellarPaymentChallenge } from '@openx/sdk';
+import { verifyHireProof, type ProofBundle } from '../services/zk/verifier';
+import { stroopsToUsdc, usdcToStroops, type PaymentMode, type StellarPaymentChallenge } from '@openx/sdk';
 import type { AuthRequest } from './auth';
 
 const PAYMENT_SECRET = process.env.PAYMENT_SECRET ?? 'dev-only-rotate-me';
@@ -74,7 +75,6 @@ function buildChallenge(
   agent: NonNullable<StellarPriceableRequest['pricedAgent']>,
   mode: PaymentMode,
 ): StellarPaymentChallenge {
-  const s = getStellar();
   const basePrice = agent.pricing?.x402 ?? '0';
   const baseStroops = usdcToStroops(basePrice);
   const stroops =
@@ -94,12 +94,13 @@ function buildChallenge(
     network: NETWORK_TAG as `stellar:${string}`,
     asset: 'USDC',
     amount_stroops: stroops.toString(),
-    // v3.0.0 — both modes settle through paywall-router (private uses the
-    // platform-relay 2-op tx; the on-chain contract that emits the 'hire'
-    // event is paywall-router in both cases). Privacy-pool contract is
-    // reserved for the v3.1 Groth16 swap behind the same `mode='private'`
-    // API surface.
-    contract_id: s.contracts.paywallRouter,
+    // Private mode advertises the ZK Privacy Pool contract when it's
+    // configured (so the smoke + integrators see the privacy-stack
+    // contract). When the pool is unset we fall through to the paywall
+    // router. Verification accepts events from either contract (see
+    // settlementContractIds() — the platform-relay path keeps working as
+    // the graceful fallback when buyer has no shielded deposit).
+    contract_id: settlementContractIds(mode)[0],
     agent_id: agent.soroban_agent_id ?? agent.id.replaceAll('-', ''),
     nonce: nonceTok,
     expires_at: exp,
@@ -108,16 +109,78 @@ function buildChallenge(
   };
 }
 
-async function verifyTxHash(txHash: string, expectedContractId: string): Promise<{ ledger: number } | null> {
+/**
+ * settlementContractIds — single source of truth for "which Soroban
+ * contract(s) may legitimately settle this payment mode".
+ *
+ *  public  → [paywallRouter]
+ *  private → [usdcSacId, privacyPool, privacyPoolToken, paywallRouter]
+ *            v3.2 default is the platform-relay strategy: buyer signs a USDC
+ *            SAC.transfer(buyer → platform) — the SAC contract emits the
+ *            settlement event we verify. The pool contracts stay accepted
+ *            for the v3.3 ZK opt-in path (see docs/runbooks/ZK_DEPLOY.md);
+ *            paywallRouter remains as a legacy fallback.
+ */
+function settlementContractIds(mode: PaymentMode): string[] {
+  const s = getStellar();
+  if (mode === 'private') {
+    const ids: string[] = [s.usdcSacId];
+    if (s.contracts.privacyPool) ids.push(s.contracts.privacyPool);
+    if (s.contracts.privacyPoolToken) ids.push(s.contracts.privacyPoolToken);
+    ids.push(s.contracts.paywallRouter);
+    return ids;
+  }
+  return [s.contracts.paywallRouter];
+}
+
+/**
+ * verifyZkHeaders — decode + verify the buyer's Groth16 proof off the request.
+ *
+ * Headers:
+ *   x-zk-proof   base64(proof JSON — snarkjs shape)
+ *   x-zk-public  base64(publicSignals JSON — [commitment, agent_bind, agent_id])
+ *
+ * We validate the proof against the vk at services/zk/verification_key.json
+ * AND enforce publicSignals[2] === Keccak(slug)[:31] so a proof for agent A
+ * cannot be replayed against agent B.
+ */
+async function verifyZkHeaders(
+  req: Request,
+  agentSlug: string,
+): Promise<{ ok: true; commitment: string } | { ok: false; reason: string }> {
+  const proofHdr = req.headers['x-zk-proof'] as string | undefined;
+  const publicsHdr = req.headers['x-zk-public'] as string | undefined;
+  if (!proofHdr || !publicsHdr) return { ok: false, reason: 'x-zk-proof / x-zk-public required for private tier' };
+  let bundle: ProofBundle;
+  try {
+    bundle = {
+      proof: JSON.parse(Buffer.from(proofHdr, 'base64').toString('utf8')),
+      publicSignals: JSON.parse(Buffer.from(publicsHdr, 'base64').toString('utf8')),
+    };
+  } catch {
+    return { ok: false, reason: 'x-zk-proof / x-zk-public base64/JSON decode failed' };
+  }
+  const r = await verifyHireProof(bundle, { expectedAgentSlug: agentSlug });
+  if ('reason' in r) {
+    return { ok: false, reason: r.reason };
+  }
+  return { ok: true, commitment: r.commitment };
+}
+
+async function verifyTxHash(
+  txHash: string,
+  expectedContractIds: string[],
+): Promise<{ ledger: number } | null> {
   if (!/^[0-9a-fA-F]{64}$/.test(txHash)) return null;
   const s = getStellar();
   try {
     const r = await s.rpc.getTransaction(txHash);
     if (r.status !== 'SUCCESS') return null;
-    // Cheap heuristic — Soroban events for the matching contract id must be present.
+    // Cheap heuristic — Soroban events for any acceptable settlement
+    // contract id must be present in the same ledger.
     const eventsResp = await s.rpc.getEvents({
       startLedger: r.ledger,
-      filters: [{ type: 'contract', contractIds: [expectedContractId] }],
+      filters: [{ type: 'contract', contractIds: expectedContractIds }],
       limit: 50,
     });
     const matches = eventsResp.events.some((e) => e.txHash === txHash);
@@ -151,25 +214,19 @@ export async function stellarPaymentGate(
   const agent = r.rows[0];
   req.pricedAgent = agent;
 
-  // Off-chain demo short-circuit — when the agent has no soroban_agent_id
-  // (chain registration was skipped or failed) the on-chain payment path is
-  // unavailable. To keep the buyer hire flow useful for testing the same way
-  // fhe-ai-context's freemium hire works, we treat the call as a free demo:
-  // record `method='demo'` and let the request through without 402. The
-  // ledger row makes the call visible in /agent/:id recent transactions.
+  // Strict-chain policy (v3.1): every paywalled call MUST settle on Soroban.
+  // The v3.0 "demo short-circuit" (free answer when soroban_agent_id is
+  // null) is gone — it silently bypassed wallet signing and USDC payment,
+  // which broke the private-x402 contract this gate exists to enforce.
+  // Atomic publish now guarantees `soroban_agent_id` is populated when
+  // `published=true`; the 412 below is the defensive last line for any
+  // legacy row left in a half-published state.
   if (!agent.soroban_agent_id) {
-    await ledger.record({
-      agentId: agent.id,
-      slug: agent.slug,
-      buyer: req.user?.address ?? 'anonymous',
-      amountUsdc: '0',
-      txHash: `demo-${crypto.randomUUID()}`,
-      network: NETWORK_TAG,
-      method: 'demo',
-      sellerId: agent.seller_id ?? null,
+    res.status(412).json({
+      error: 'agent_pending_onchain_registration',
+      detail:
+        'This agent has no Soroban registration yet — ask the seller to (re-)publish so the on-chain agent_id is committed.',
     });
-    req.receipt = { tx_hash: 'demo', amount_usdc: '0', payment_mode: 'public' };
-    next();
     return;
   }
 
@@ -227,21 +284,42 @@ export async function stellarPaymentGate(
     res.status(402).json(buildChallenge(agent, mode));
     return;
   }
-  const expectedContract = getStellar().contracts.paywallRouter;
-  const verified = await verifyTxHash(txHash, expectedContract);
+  const expectedContracts = settlementContractIds(mode);
+  const verified = await verifyTxHash(txHash, expectedContracts);
   if (!verified) {
     res.status(402).json(buildChallenge(agent, mode));
     return;
+  }
+
+  // Private tier: also require a valid Groth16 ZK proof bound to this agent.
+  // Real snarkjs proof; server-side verification (Path B'); on-chain verifier
+  // deployment is v3.4. See docs/runbooks/ZK_DEPLOY.md.
+  let zkCommitment: string | null = null;
+  if (mode === 'private') {
+    const zkResult = await verifyZkHeaders(req, agent.slug);
+    if ('reason' in zkResult) {
+      logger.info({ slug: agent.slug, reason: zkResult.reason }, 'stellarPaymentGate:zk-reject');
+      res.status(402).json({ ...buildChallenge(agent, mode), zk_error: zkResult.reason });
+      return;
+    }
+    zkCommitment = zkResult.commitment;
+    // Replay-protection: reject if the same commitment already settled.
+    if (await ledger.isZkCommitmentUsed(zkCommitment)) {
+      logger.info({ slug: agent.slug, commitment: zkCommitment.slice(0, 12) }, 'stellarPaymentGate:zk-replay');
+      res.status(402).json({ ...buildChallenge(agent, mode), zk_error: 'proof replay: commitment already used' });
+      return;
+    }
   }
   await ledger.record({
     agentId: agent.id,
     slug: agent.slug,
     buyer: req.user?.address ?? 'anonymous',
-    amountUsdc: String(nonce.stroops ?? '0'),
+    amountUsdc: stroopsToUsdc(BigInt(String(nonce.stroops ?? '0'))),
     txHash,
     network: NETWORK_TAG,
     method: mode === 'private' ? 'privacy_pool' : 'stellar_x402',
     sellerId: agent.seller_id ?? null,
+    zkCommitment,
   });
   req.receipt = {
     tx_hash: txHash,

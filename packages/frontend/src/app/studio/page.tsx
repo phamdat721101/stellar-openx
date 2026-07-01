@@ -79,6 +79,26 @@ export default function StudioPage() {
     else setError(`archive failed: ${await r.text()}`);
   };
 
+  /**
+   * withdrawShielded — v3.2. Delegates to the same ZK transact pipeline the
+   * buyer uses on `/agent/[id]`, only with `ext_amount < 0` (a withdrawal).
+   * The actual proof + note assembly lives on the buyer/hire page today; we
+   * navigate there with a query flag so the seller reuses the same UX + wallet
+   * signing path instead of duplicating the pipeline in Studio.
+   *
+   * SOLID: SRP kept — Studio owns the seller dashboard concern, not proving.
+   */
+  const withdrawShielded = (agent: Agent) => {
+    if (!address) return;
+    const accrued = stats[agent.id]?.revenue_usdc ?? '0';
+    if (Number(accrued) <= 0) {
+      setError('nothing to withdraw yet — sell a call first');
+      return;
+    }
+    // Deep-link to the shielded withdrawal flow.
+    window.location.href = `/agent/${agent.id}?withdraw=1&amount=${accrued}`;
+  };
+
   if (!address) {
     return (
       <div className="mx-auto max-w-md space-y-4 py-20 text-center">
@@ -148,7 +168,15 @@ export default function StudioPage() {
                     <dt>Revenue</dt>
                     <dd className="text-base font-semibold text-white">${s?.revenue_usdc ?? '0.0000'}</dd>
                   </div>
-                  <div className="ml-auto">
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      onClick={() => withdrawShielded(a)}
+                      disabled={!s?.calls}
+                      className="rounded border border-emerald-700/50 px-2 py-1 text-xs text-emerald-300 hover:border-emerald-400 hover:text-emerald-200 disabled:opacity-30"
+                      title="Claim accrued revenue as a shielded note (v3.2)"
+                    >
+                      Withdraw shielded
+                    </button>
                     <button
                       onClick={() => archive(a)}
                       className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:border-red-500 hover:text-red-300"

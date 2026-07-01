@@ -152,47 +152,38 @@ export async function buildHireAgentXdr(
   return prepared.toXDR();
 }
 
+// The v3.1 `buildPrivateHireXdr` (single-op platform-relay via SAC transfer)
+// was removed in v3.2. Private-tier settlement now goes through Nethermind's
+// audited Privacy Pool via `services/stellar/privacyPool.ts::buildTransactXdr`.
+// Callers should:
+//   1. Fetch pool metadata via GET /v3/marketplace/private-hire-context.
+//   2. Generate a Groth16 proof client-side using @openx/sdk (zk module).
+//   3. Submit the proof to POST /v3/marketplace/build-private-transact-xdr,
+//      which delegates to `stellar/privacyPool.buildTransactXdr()`.
+
 /**
- * buildPrivateHireXdr — x402 "private" tier on Stellar (v3.0.0 platform-relay).
+ * buildPlatformRelayHireXdr — Private tier v3.2 (default, working).
  *
- * The paywall-router Soroban contract intentionally reverts on `PaymentMode::Private`
- * (see `paywall-router/src/lib.rs` line ~95). A Groth16-backed Privacy Pool
- * private_transfer is the v3.1 target. For v3.0.0 MVP we ship a semi-trusted
- * platform-relay path that keeps the same `mode='private'` API surface:
+ * A single-op USDC SAC transfer from the buyer to the platform account. The
+ * on-chain artifact is opaque about the SELLER (counterparty hidden — the
+ * platform intermediates). Amount is on-ledger; that's the trade-off vs the
+ * full ZK path (v3.3 opt-in via `privacyPool.buildTransactXdr`, gated on
+ * operator picking Path A or Path B in docs/runbooks/ZK_DEPLOY.md).
  *
- *   Op1: buyer → platform USDC transfer (via SAC) for `price * private_multiplier`.
- *   Op2: paywall-router.hire_agent(PLATFORM, agent_id, query_hash, Public) signed
- *        by the platform's Soroban keypair — so the on-chain buyer↔agent link
- *        is broken (the agent only sees the platform).
- *
- * Atomicity: both ops live in one Stellar transaction. Settlement is recorded
- * in `paid_calls.method='privacy_pool'` (already allowed by 038_strip_fhe_add_stellar.sql).
- *
- * Threat model: the platform sees the buyer↔agent linkage off-ledger. On-chain,
- * a third-party observer sees only:
- *   - many buyers paying the platform
- *   - the platform paying many agents
- * — which is the same anonymity-set shielding as a centralised mixer. Upgrading
- * to a trustless ZK Privacy Pool is a v3.1 swap behind this same endpoint.
- *
- * Returns: a partially-signed XDR (platform side already signed). The buyer
- * adds their signature for Op1 (the SAC transfer) and submits via /v3/marketplace/submit.
+ * SOLID:
+ *  - SRP: only builds the transfer tx envelope. Off-chain seller reconciliation
+ *    is `paid-call-ledger`'s job, kicked by `stellarPaymentGate.record()`.
+ *  - LSP: signature parallels `buildHireAgentXdr` — both return a prepared
+ *    Soroban XDR the wallet co-signs.
  */
-export async function buildPrivateHireXdr(
+export async function buildPlatformRelayHireXdr(
   buyer: string,
-  agentId: Buffer,
-  queryHash: Buffer,
   buyerAmountStroops: bigint,
 ): Promise<string> {
   const s = getStellar();
-  const platform = s.platformKeypair.publicKey();
   if (buyerAmountStroops <= 0n) throw new Error('buyerAmountStroops must be > 0');
-
-  // Single tx, source = buyer (so the buyer pays fee + Op1 auth comes from buyer).
-  // Op2 auth is sourced by the platform keypair, which we sign before returning.
-  const builder = await s.buildTx(buyer);
-  const tx = builder
-    // Op1 — buyer → platform USDC via the SAC.
+  const platform = s.platformKeypair.publicKey();
+  const tx = (await s.buildTx(buyer))
     .addOperation(
       new Contract(s.usdcSacId).call(
         'transfer',
@@ -201,23 +192,8 @@ export async function buildPrivateHireXdr(
         nativeToScVal(buyerAmountStroops, { type: 'i128' }),
       ),
     )
-    // Op2 — paywall-router.hire_agent(PLATFORM, …, Public). Mode::Public so the
-    // router accepts it; the on-chain "buyer" is the platform. The platform's
-    // payout to the agent (95/5 split) happens inside paywall-router using the
-    // platform's pre-existing USDC balance funded by Op1.
-    .addOperation(
-      new Contract(s.contracts.paywallRouter).call(
-        'hire_agent',
-        new Address(platform).toScVal(),
-        nativeToScVal(agentId, { type: 'bytes' }),
-        nativeToScVal(queryHash, { type: 'bytes' }),
-        xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('Public')]),
-      ),
-    )
     .build();
   const prepared = await s.rpc.prepareTransaction(tx);
-  // Platform pre-signs Op2's auth. Buyer co-signs the envelope on the wire.
-  prepared.sign(s.platformKeypair);
   return prepared.toXDR();
 }
 

@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@openx/sdk": "*",
-    "@stellar/stellar-sdk": "^13.3.0",
+    "@stellar/stellar-sdk": "^15.1.0",
     "@supabase/supabase-js": "^2.45.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

@@ -12,7 +12,15 @@ import { logger } from '../lib';
 import { pool } from '../db';
 import type { AuthRequest } from '../middleware/auth';
 import { sellerPublishService } from '../services/sellerPublishService';
-import { buildHireAgentXdr, buildPrivateHireXdr } from '../services/stellar/marketplace';
+import {
+  buildHireAgentXdr,
+  buildPlatformRelayHireXdr,
+} from '../services/stellar/marketplace';
+import {
+  buildTransactXdr,
+  type ExtDataJson,
+  type PoolProofJson,
+} from '../services/stellar/privacyPool';
 import { getStellar } from '../services/stellar/client';
 import * as credits from '../services/creditService';
 import { TransactionBuilder } from '@stellar/stellar-sdk';
@@ -120,9 +128,11 @@ router.post('/seller/agent/:id/build-hire-xdr', async (req: AuthRequest, res: Re
     return res.json({ xdr, payment_mode });
   }
 
-  // Private mode — platform-relay path (v3.0.0 MVP). paywall-router reverts on
-  // Mode::Private, so we build an atomic 2-op tx: buyer→platform USDC + platform-
-  // signed hire_agent(Public). Buyer↔agent linkage is broken on-chain.
+  // Private mode (v3.2 default) — platform-relay strategy. Buyer signs a
+  // single USDC SAC transfer to the platform account (counterparty invisible
+  // on chain). Off-chain reconciliation via paid-call-ledger. The full ZK
+  // strategy lives at POST /build-private-transact-xdr and is opt-in for
+  // v3.3 once the operator picks Path A/B in docs/runbooks/ZK_DEPLOY.md.
   const basePrice = (r.rows[0].pricing?.x402 as string | undefined) ?? '0';
   if (!basePrice || Number(basePrice) <= 0) {
     return res.status(412).json({ error: 'agent has no on-chain price' });
@@ -131,22 +141,35 @@ router.post('/seller/agent/:id/build-hire-xdr', async (req: AuthRequest, res: Re
   const baseStroops = usdcToStroops(basePrice);
   const totalStroops = (baseStroops * BigInt(Math.round(multiplier * 1000))) / 1000n;
   try {
-    const xdr = await buildPrivateHireXdr(
-      req.user.address,
-      Buffer.from(sorobanAgentId, 'hex'),
-      queryHash,
-      totalStroops,
-    );
-    res.json({
+    const xdr = await buildPlatformRelayHireXdr(req.user.address, totalStroops);
+    return res.json({
       xdr,
       payment_mode,
-      pre_signed_by: 'platform',
       amount_stroops: totalStroops.toString(),
-      note: 'platform-relay v3.0.0 — co-sign with buyer key then submit',
+      strategy: 'platform-relay',
     });
   } catch (err) {
-    logger.warn({ err: (err as Error).message }, 'marketplace:build-private-hire:failed');
-    res.status(500).json({ error: 'build_private_hire_failed', detail: (err as Error).message });
+    logger.warn({ err: (err as Error).message }, 'marketplace:build-private-relay:failed');
+    return res.status(500).json({ error: 'build_private_hire_failed', detail: (err as Error).message });
+  }
+});
+
+// POST /build-private-transact-xdr — buyer submits their client-generated
+// Groth16 proof + ExtData; server encodes them to ScVal and returns the
+// prepared XDR envelope for the wallet to co-sign.
+router.post('/build-private-transact-xdr', async (req: AuthRequest, res: Response) => {
+  if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
+  const { proof, ext_data } = (req.body ?? {}) as {
+    proof?: PoolProofJson;
+    ext_data?: ExtDataJson;
+  };
+  if (!proof || !ext_data) return res.status(400).json({ error: 'proof + ext_data required' });
+  try {
+    const xdr = await buildTransactXdr({ sender: req.user.address, proof, extData: ext_data });
+    res.json({ xdr, payment_mode: 'private' });
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'marketplace:build-private-transact:failed');
+    res.status(500).json({ error: 'build_private_transact_failed', detail: (err as Error).message });
   }
 });
 

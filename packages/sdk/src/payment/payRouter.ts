@@ -46,6 +46,26 @@ export interface StellarRpc {
   }): Promise<{ tx_hash: string; ledger?: number }>;
 }
 
+/**
+ * PrivateXdrBuilder — DIP seam for the `'private'` payment mode.
+ *
+ * The SDK never touches HTTP, never generates ZK proofs, never holds keys.
+ * It hands a `StellarPaymentChallenge` to the caller-injected builder, which
+ * is responsible for returning a wallet-ready XDR (either the platform-relay
+ * 2-op tx in v3.0.0 or a real `privacy-pool.private_transfer` envelope in
+ * v3.1+). The SDK then walks the standard sign → submit pipeline.
+ *
+ * Frontends typically inject a `fetch`-backed implementation that calls
+ * `/v3/marketplace/seller/agent/:id/build-hire-xdr` and `/v3/marketplace/submit`
+ * on the OpenX API. Tests can inject an in-memory stub.
+ */
+export interface PrivateXdrBuilder {
+  /** Returns a pre-prepared, optionally pre-signed XDR for the buyer to co-sign. */
+  buildHireXdr(challenge: StellarPaymentChallenge, buyer: string): Promise<string>;
+  /** Broadcasts the buyer-signed XDR and returns the Stellar tx hash + ledger. */
+  submit(signedXdr: string): Promise<{ tx_hash: string; ledger?: number }>;
+}
+
 export interface PaidEndpointResult {
   /** Settled receipt; ready to attach to `X-PAYMENT` for the retry. */
   receipt: StellarPaymentReceipt;
@@ -54,11 +74,13 @@ export interface PaidEndpointResult {
 export interface PayOptions {
   signer: WalletSigner;
   rpc: StellarRpc;
+  /** Required when `challenge.payment_mode === 'private'`. */
+  privateBuilder?: PrivateXdrBuilder;
 }
 
 /**
  * Single entry — given a Stellar payment challenge, dispatch to either
- * the paywall-router (public) or privacy-pool (private) flow.
+ * the paywall-router (public) or privacy-pool envelope (private) flow.
  */
 export async function payChallenge(
   challenge: StellarPaymentChallenge,
@@ -73,9 +95,9 @@ export async function payChallenge(
   }
 
   const buyer = await opts.signer.getAddress();
-  const contract = new Contract(challenge.contract_id);
 
   if (challenge.payment_mode === 'public') {
+    const contract = new Contract(challenge.contract_id);
     const result = await opts.rpc.invoke({
       contract,
       method: 'hire_agent',
@@ -98,12 +120,26 @@ export async function payChallenge(
     };
   }
 
-  // Private: invoke privacy_pool.private_transfer. The buyer must have a
-  // pre-existing deposit + zk proof in the wallet's signer (off-chain wallet
-  // plumbing — the SDK does not generate proofs).
-  throw new Error(
-    'payRouter: private mode requires PrivacyPoolTransfer prepared off-chain (see services/stellar/privacyPool.ts on the API side)',
-  );
+  // Private — delegate XDR construction to the caller's builder so the SDK
+  // stays free of HTTP and ZK proof gen. Builder is responsible for picking
+  // the platform-relay path (v3.0) or the real `privacy-pool.private_transfer`
+  // path (v3.1+) based on whether the buyer has a shielded deposit + proof.
+  if (!opts.privateBuilder) {
+    throw new Error(
+      'payRouter: private mode requires opts.privateBuilder — inject an XDR delegate that hits your platform-relay or privacy-pool endpoint',
+    );
+  }
+  const xdr = await opts.privateBuilder.buildHireXdr(challenge, buyer);
+  const signedXdr = await opts.signer.signTransaction(xdr, passphrase);
+  const submitted = await opts.privateBuilder.submit(signedXdr);
+  return {
+    receipt: {
+      tx_hash: submitted.tx_hash,
+      payment_mode: 'private',
+      ledger: submitted.ledger,
+      amount_stroops: challenge.amount_stroops,
+    },
+  };
 }
 
 /** Lightweight check used by the frontend toggle before calling payChallenge. */

@@ -12,3 +12,4 @@
 export * from './constants';
 export * from './payment/paymentTypes';
 export * from './payment/payRouter';
+export * from './zk';

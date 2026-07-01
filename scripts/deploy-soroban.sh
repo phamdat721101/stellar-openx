@@ -89,15 +89,16 @@ if [ "$TARGETS" = "all" ]; then
   deploy_one agent-registry   STELLAR_AGENT_REGISTRY_ID
   deploy_one paid-call-ledger STELLAR_PAID_CALL_LEDGER_ID
   deploy_one paywall-router   STELLAR_PAYWALL_ROUTER_ID
-  deploy_one privacy-pool     STELLAR_PRIVACY_POOL_ID
+  # privacy-pool is consumed as an external cross-contract (Nethermind's
+  # audited deployment). Run `bash scripts/deploy-privacy-pool.sh` to pin
+  # its addresses into .env.local — no wasm build/deploy needed here.
 else
   for t in $TARGETS; do
     case "$t" in
       agent-registry)   deploy_one agent-registry   STELLAR_AGENT_REGISTRY_ID ;;
       paid-call-ledger) deploy_one paid-call-ledger STELLAR_PAID_CALL_LEDGER_ID ;;
       paywall-router)   deploy_one paywall-router   STELLAR_PAYWALL_ROUTER_ID ;;
-      privacy-pool)     deploy_one privacy-pool     STELLAR_PRIVACY_POOL_ID ;;
-      *) echo "Unknown target: $t" >&2; exit 1 ;;
+      *) echo "Unknown target: $t (privacy-pool is external — see scripts/deploy-privacy-pool.sh)" >&2; exit 1 ;;
     esac
   done
 fi

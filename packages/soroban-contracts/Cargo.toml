@@ -1,9 +1,14 @@
-# Soroban workspace — four production contracts for OpenX-S
+# Soroban workspace — three production contracts for OpenX-S
 #
 # - agent-registry   : agent listings + KYA replacement
 # - paywall-router   : x402-on-Stellar payment dispatch (95/5 USDC split)
 # - paid-call-ledger : per-call revenue accumulator + dispute / refund
-# - privacy-pool     : Nethermind fork — optional Privacy Pool premium tier
+#
+# Note: the Privacy Pool premium tier is provided by Nethermind's audited
+# deployment (contracts/pool + asp-membership + asp-non-membership +
+# CircomGroth16Verifier). We consume those as external cross-contracts —
+# see docs/runbooks/ZK_DEPLOY.md and packages/api/src/services/stellar/
+# privacyPool.ts. No local ZK contract lives in this workspace.
 #
 # Build:  cargo build --release --target wasm32-unknown-unknown
 # Test :  cargo test --workspace
@@ -14,7 +19,6 @@ members = [
     "agent-registry",
     "paywall-router",
     "paid-call-ledger",
-    "privacy-pool",
 ]
 
 [workspace.package]

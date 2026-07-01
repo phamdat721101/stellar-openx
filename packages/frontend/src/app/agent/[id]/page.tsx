@@ -25,8 +25,13 @@ import { useParams } from 'next/navigation';
 import { PrivacyModeToggle } from '@/components/PrivacyModeToggle';
 import { useStellarWallet } from '@/hooks/useStellarWallet';
 import { useConnectedPrivacyMode } from '@/hooks/useConnectedPrivacyMode';
-import { API_URL } from '@/lib/stellar';
-import type { StellarPaymentChallenge } from '@openx/sdk';
+import { API_URL, fmtUsdcAmount, stellarExplorerTxUrl } from '@/lib/stellar';
+import {
+  hireAgentIdField,
+  prove,
+  randomScalar248,
+  type StellarPaymentChallenge,
+} from '@openx/sdk';
 
 interface Agent {
   id: string;
@@ -95,7 +100,9 @@ export default function AgentDetailPage() {
     setErr(null);
     setAnswer(null);
     try {
-      // 1. First call — 402 challenge OR direct 200 (off-chain demo path).
+      // 1. First call — expect a 402 challenge. (v3.1 removed the
+      //    "demo bypass" that used to return 200 + a free answer when the
+      //    agent wasn't on-chain; that path leaked private payments.)
       const r0 = await fetch(`${API_URL}/api/v1/${agent.slug}`, {
         method: 'POST',
         headers: {
@@ -105,33 +112,51 @@ export default function AgentDetailPage() {
         },
         body: JSON.stringify({ question }),
       });
-      if (r0.status === 200) {
-        // Off-chain demo (agent not yet registered on Soroban). Skip the
-        // wallet-sign dance and surface the answer directly.
-        const j = (await r0.json()) as { answer: string };
-        setAnswer(j.answer);
-        void refresh();
-        return;
+      if (r0.status === 412) {
+        throw new Error('Agent is awaiting on-chain registration — try again once the seller re-publishes.');
       }
       if (r0.status !== 402) throw new Error(`expected 402, got ${r0.status}`);
       const challenge = (await r0.json()) as StellarPaymentChallenge & { nonce: string };
 
-      // 2. Build XDR (works for both public + private; backend dispatches)
+      // 1b. Private tier: generate a real Groth16 proof bound to this agent
+      //     BEFORE building the XDR — the proof is required by the payment
+      //     gate on retry. Same wasm+zkey the runbook installs (Path B').
+      let zkHeaders: Record<string, string> = {};
+      if (mode === 'private') {
+        setErr('Generating ZK proof… (≈3–8 s)');
+        const wasmUrl = process.env.NEXT_PUBLIC_ZK_CIRCUIT_WASM_URL ?? '/circuits/prove_hire.wasm';
+        const zkeyUrl = process.env.NEXT_PUBLIC_ZK_CIRCUIT_ZKEY_URL ?? '/circuits/prove_hire_final.zkey';
+        const inputs = {
+          secret: randomScalar248().toString(),
+          nonce: randomScalar248().toString(),
+          agent_id: hireAgentIdField(agent.slug).toString(),
+        };
+        const { proof, publicSignals } = await prove(inputs, { wasmUrl, zkeyUrl });
+        zkHeaders = {
+          'x-zk-proof': btoa(JSON.stringify(proof)),
+          'x-zk-public': btoa(JSON.stringify(publicSignals)),
+        };
+        setErr(null);
+      }
+
+      // 2. Build XDR — same shape for public and private in v3.2. Private
+      //    uses the platform-relay strategy; the ZK proof gates settlement.
       const xdrRes = await fetch(`${API_URL}/v3/marketplace/seller/agent/${agent.id}/build-hire-xdr`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-stellar-address': address },
         body: JSON.stringify({ payment_mode: mode, nonce: challenge.nonce }),
       });
       if (!xdrRes.ok) throw new Error(`build_xdr ${xdrRes.status}`);
-      const { xdr } = (await xdrRes.json()) as { xdr: string };
+      const xdrToSign = ((await xdrRes.json()) as { xdr: string }).xdr;
 
       // 3. Wallet co-signs + submit
-      const signed = await signTransaction(xdr);
+      const signed = await signTransaction(xdrToSign);
       const submitRes = await fetch(`${API_URL}/v3/marketplace/submit`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-stellar-address': address },
         body: JSON.stringify({ signed_xdr: signed }),
       });
+      if (!submitRes.ok) throw new Error(`submit ${submitRes.status}`);
       const submitJson = (await submitRes.json()) as { tx_hash?: string };
       if (!submitJson.tx_hash) throw new Error('submit failed');
 
@@ -144,6 +169,7 @@ export default function AgentDetailPage() {
           'x-payment': `stellar ${submitJson.tx_hash}`,
           'x-payment-mode': mode,
           'x-payment-nonce': challenge.nonce,
+          ...zkHeaders,
         },
         body: JSON.stringify({ question }),
       });
@@ -152,10 +178,26 @@ export default function AgentDetailPage() {
       setAnswer(j.answer);
       void refresh();
     } catch (e) {
-      setErr((e as Error).message);
+      const msg = (e as Error).message;
+      // If any zk-* error surfaces, the buyer's Private attempt failed on our
+      // side (missing/misformatted circuit assets). Public tier is unaffected
+      // — surface it as a one-click fallback so the buyer always has a path.
+      const zkFailure = /^zk-|private tier not configured|private_context|build_private_transact/.test(msg);
+      if (zkFailure && mode === 'private') {
+        setErr(`${msg}\nSwitch to Public ($${Number(agent.pricing?.x402 ?? 0).toFixed(2)}) below to complete this call.`);
+      } else {
+        setErr(msg);
+      }
     } finally {
       setBusy(false);
     }
+  };
+
+  const switchToPublicAndHire = () => {
+    setMode('public');
+    setErr(null);
+    // Defer to next tick so the mode state has committed before we resubmit.
+    setTimeout(() => void hire(), 0);
   };
 
   if (loading) return <div className="py-20 text-center text-zinc-500">Loading agent…</div>;
@@ -240,7 +282,7 @@ export default function AgentDetailPage() {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={hire}
-                disabled={busy || connecting}
+                disabled={busy || connecting || !onChain}
                 className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy
@@ -250,11 +292,24 @@ export default function AgentDetailPage() {
                     : `Hire · ${mode === 'private' ? 'Private' : 'Public'}`}
               </button>
               {!onChain && (
-                <span className="text-xs text-zinc-500">
-                  Demo mode — chain payment skipped until the seller registers on Soroban.
+                <span className="text-xs text-amber-400">
+                  Awaiting on-chain registration — the seller must publish this agent before buyers can pay USDC.
                 </span>
               )}
-              {err && <span className="text-sm text-red-400">{err}</span>}
+              {err && (
+                <div className="flex flex-col gap-2">
+                  <span className="whitespace-pre-line text-sm text-red-400">{err}</span>
+                  {mode === 'private' && /^zk-|private/.test(err) && (
+                    <button
+                      onClick={switchToPublicAndHire}
+                      disabled={busy}
+                      className="self-start rounded-lg border border-emerald-600 bg-emerald-950/40 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:border-emerald-400 hover:text-emerald-200 disabled:opacity-50"
+                    >
+                      Switch to Public · ${Number(price).toFixed(2)}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             {answer && (
               <article className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
@@ -284,20 +339,46 @@ export default function AgentDetailPage() {
                 </p>
               ) : (
                 <ul className="divide-y divide-zinc-800/80">
-                  {recent.map((r) => (
-                    <li
-                      key={r.tx_hash}
-                      className="flex items-center justify-between gap-2 py-1.5 font-mono text-[11px]"
-                      title={r.tx_hash}
-                    >
-                      <span className="truncate text-emerald-300">{r.buyer_anon}</span>
-                      <span className="text-zinc-100">${Number(r.amount_usdc).toFixed(2)}</span>
-                      <span className="shrink-0 rounded-full border border-zinc-700 px-1.5 py-0.5 text-[9px] uppercase text-zinc-400">
-                        {r.method.replace('stellar_', '').replace('privacy_pool', 'private')}
-                      </span>
-                      <span className="shrink-0 text-zinc-500">{relTime(r.created_at)}</span>
-                    </li>
-                  ))}
+                  {recent.map((r) => {
+                    const explorer = stellarExplorerTxUrl(r.tx_hash);
+                    const body = (
+                      <>
+                        <span className="truncate text-emerald-300">{r.buyer_anon}</span>
+                        <span className="text-zinc-100">${fmtUsdcAmount(r.amount_usdc)}</span>
+                        <span className="shrink-0 rounded-full border border-zinc-700 px-1.5 py-0.5 text-[9px] uppercase text-zinc-400">
+                          {r.method.replace('stellar_', '').replace('privacy_pool', 'private')}
+                        </span>
+                        <span className="shrink-0 text-zinc-500">{relTime(r.created_at)}</span>
+                        {explorer && (
+                          <span
+                            aria-hidden
+                            className="shrink-0 text-zinc-500 group-hover:text-emerald-300"
+                            title="View on Stellar Expert"
+                          >
+                            ↗
+                          </span>
+                        )}
+                      </>
+                    );
+                    return (
+                      <li key={r.tx_hash} className="group" title={r.tx_hash}>
+                        {explorer ? (
+                          <a
+                            href={explorer}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="flex items-center justify-between gap-2 py-1.5 font-mono text-[11px] hover:bg-zinc-800/40 -mx-2 px-2 rounded"
+                          >
+                            {body}
+                          </a>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2 py-1.5 font-mono text-[11px]">
+                            {body}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

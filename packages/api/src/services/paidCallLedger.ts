@@ -35,15 +35,26 @@ export interface PaidCallRecord {
   network: string;
   method: PaidCallMethod;
   sellerId?: number | null;
+  /** ZK commitment (privacy tier) — enables replay protection via unique index. */
+  zkCommitment?: string | null;
 }
 
 export async function record(call: PaidCallRecord): Promise<boolean> {
   const r = await pool.query(
-    `INSERT INTO paid_calls (agent_id, slug, buyer, amount_usdc, tx_hash, network, method)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO paid_calls (agent_id, slug, buyer, amount_usdc, tx_hash, network, method, zk_commitment)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (network, tx_hash) DO NOTHING
      RETURNING id`,
-    [call.agentId, call.slug, call.buyer.toLowerCase(), call.amountUsdc, call.txHash, call.network, call.method],
+    [
+      call.agentId,
+      call.slug,
+      call.buyer.toLowerCase(),
+      call.amountUsdc,
+      call.txHash,
+      call.network,
+      call.method,
+      call.zkCommitment ?? null,
+    ],
   );
   const fresh = (r.rowCount ?? 0) > 0;
   if (fresh) {
@@ -66,6 +77,18 @@ export async function record(call: PaidCallRecord): Promise<boolean> {
     logger.debug({ txHash: call.txHash }, 'paidCall:duplicate');
   }
   return fresh;
+}
+
+/**
+ * Check whether a ZK commitment has already been consumed. Used by the
+ * private-tier gate to reject proof replay before crypto verification bails.
+ */
+export async function isZkCommitmentUsed(commitment: string): Promise<boolean> {
+  const r = await pool.query(
+    `SELECT 1 FROM paid_calls WHERE zk_commitment = $1 LIMIT 1`,
+    [commitment],
+  );
+  return (r.rowCount ?? 0) > 0;
 }
 
 export async function countToday(slug: string): Promise<number> {

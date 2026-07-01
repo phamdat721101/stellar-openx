@@ -15,6 +15,9 @@ npx tsx scripts/smoke-stellar-marketplace-e2e.ts
 echo "▶︎ smoke: privacy-pool 402 envelope"
 npx tsx scripts/smoke-stellar-privacy-pool-e2e.ts
 
+echo "▶︎ smoke: zk private hire pipeline (skips gracefully when unconfigured)"
+npx tsx scripts/smoke-zk-e2e.ts
+
 echo "▶︎ smoke: coinflow stellar session"
 npx tsx scripts/smoke-coinflow-stellar-e2e.ts
 
