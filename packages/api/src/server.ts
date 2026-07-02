@@ -94,4 +94,21 @@ try {
 
 const PORT = Number(process.env.PORT ?? 3001);
 const server = app.listen(PORT, () => logger.info({ port: PORT }, 'api:listening'));
+
+// PRD-T stale-escrow notifier — every 5 min, log/notify sellers whose escrows
+// crossed the ESCROW_TIMEOUT_HOURS threshold so they know to click "Claim
+// overdue" in Studio. No auto-action here (seller must sign the dispute tx).
+const STALE_INTERVAL_MS = 5 * 60 * 1000;
+setInterval(async () => {
+  try {
+    const { escrowService } = await import('./services/trustlessWork/escrowService');
+    const rows = await escrowService.listStale();
+    if (rows.length > 0) {
+      logger.info({ count: rows.length }, 'escrow:stale:tick');
+    }
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'escrow:stale:tick:failed');
+  }
+}, STALE_INTERVAL_MS).unref();
+
 installLifecycle(server);

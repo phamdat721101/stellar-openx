@@ -21,4 +21,7 @@ npx tsx scripts/smoke-zk-e2e.ts
 echo "▶︎ smoke: coinflow stellar session"
 npx tsx scripts/smoke-coinflow-stellar-e2e.ts
 
+echo "▶︎ smoke: trustless-work escrow (PRD-T)"
+npx tsx scripts/smoke-trustless-escrow-e2e.ts
+
 echo "✅ all smokes green"

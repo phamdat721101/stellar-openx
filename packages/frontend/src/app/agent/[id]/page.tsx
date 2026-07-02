@@ -25,6 +25,7 @@ import { useParams } from 'next/navigation';
 import { PrivacyModeToggle } from '@/components/PrivacyModeToggle';
 import { useStellarWallet } from '@/hooks/useStellarWallet';
 import { useConnectedPrivacyMode } from '@/hooks/useConnectedPrivacyMode';
+import { useEscrowActions } from '@/hooks/useEscrowActions';
 import { API_URL, fmtUsdcAmount, stellarExplorerTxUrl } from '@/lib/stellar';
 import {
   hireAgentIdField,
@@ -65,6 +66,10 @@ export default function AgentDetailPage() {
   const [answer, setAnswer] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // PRD-T escrow tier — persists across renders so Approve/Dispute buttons
+  // survive answer scrolling / page refreshes via localStorage.
+  const [escrowAddr, setEscrowAddr] = useState<string | null>(null);
+  const [escrowDone, setEscrowDone] = useState<'approved' | 'released' | 'disputed' | null>(null);
 
   const refresh = useCallback(async () => {
     if (!id) return;
@@ -94,6 +99,12 @@ export default function AgentDetailPage() {
     }
     if (!question.trim()) {
       setErr('Type a question first.');
+      return;
+    }
+    // PRD-T — escrow tier runs a fully different flow (no 402 challenge; the
+    // funded on-chain escrow IS the receipt). Dispatch here.
+    if (mode === 'escrow') {
+      void hireEscrow();
       return;
     }
     setBusy(true);
@@ -198,6 +209,126 @@ export default function AgentDetailPage() {
     setErr(null);
     // Defer to next tick so the mode state has committed before we resubmit.
     setTimeout(() => void hire(), 0);
+  };
+
+  // ── PRD-T escrow flow ─────────────────────────────────────────────────────
+  //
+  // 4 wallet signatures: deploy → fund → (server delivers answer) → approve
+  // → release. Buyer can dispute instead of approve. localStorage caches the
+  // in-flight contract address so a refresh doesn't lose the escrow.
+
+  const escrowStorageKey = agent ? `openx.escrow.${agent.id}` : '';
+
+  useEffect(() => {
+    if (!agent) return;
+    try {
+      const cached = window.localStorage.getItem(`openx.escrow.${agent.id}`);
+      if (cached) {
+        const p = JSON.parse(cached);
+        if (p?.contract_address) setEscrowAddr(p.contract_address);
+        if (p?.answer) setAnswer(p.answer);
+        if (p?.status) setEscrowDone(p.status);
+      }
+    } catch { /* ignore */ }
+  }, [agent]);
+
+  const persistEscrow = (patch: Record<string, unknown>) => {
+    if (!agent) return;
+    try {
+      const key = `openx.escrow.${agent.id}`;
+      const cur = JSON.parse(window.localStorage.getItem(key) ?? '{}');
+      window.localStorage.setItem(key, JSON.stringify({ ...cur, ...patch }));
+    } catch { /* ignore */ }
+  };
+
+  const runEscrowAction = useEscrowActions(address, signTransaction);
+
+  const hireEscrow = async () => {
+    if (!agent) return;
+    setBusy(true);
+    setAnswer(null);
+    setEscrowDone(null);
+    setErr(null);
+    try {
+      // 1. Deploy escrow (buyer sign #1) — server pre-builds via TW deploy.
+      setErr('Step 1/4 · Deploying escrow contract… sign in wallet');
+      const dep = await runEscrowAction({ action: 'deploy', agent_id: agent.id, question });
+      setEscrowAddr(dep.contract_address);
+      persistEscrow({ contract_address: dep.contract_address, status: 'deploying' });
+
+      // 2. Fund escrow (buyer sign #2)
+      setErr('Step 2/4 · Locking USDC in escrow… sign in wallet');
+      await runEscrowAction({ action: 'fund', contract_address: dep.contract_address });
+      persistEscrow({ status: 'funded' });
+
+      // 3. Trigger inference — the gate accepts the funded escrow as receipt.
+      setErr('Step 3/4 · Agent working…');
+      const infRes = await fetch(`${API_URL}/api/v1/${agent.slug}`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-stellar-address': address ?? '',
+          'x-payment-mode': 'escrow',
+          'x-payment': `escrow ${dep.contract_address}`,
+        },
+        body: JSON.stringify({ question }),
+      });
+      if (!infRes.ok) throw new Error(`inference ${infRes.status}: ${await infRes.text()}`);
+      const inf = (await infRes.json()) as { answer: string };
+      setAnswer(inf.answer);
+      persistEscrow({ answer: inf.answer, status: 'answered' });
+
+      // 4. Wait for buyer to click Approve or Dispute — no auto-sign.
+      setErr('Step 4/4 · Review the answer and click Approve & release (or Dispute).');
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const escrowApprove = async () => {
+    if (!escrowAddr) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      setErr('Approve · sign #1/2 in wallet…');
+      await runEscrowAction({ action: 'approve', contract_address: escrowAddr });
+      setErr('Release · sign #2/2 in wallet…');
+      await runEscrowAction({ action: 'release', contract_address: escrowAddr });
+      setEscrowDone('released');
+      setErr(null);
+      persistEscrow({ status: 'released' });
+      void refresh();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const escrowDispute = async () => {
+    if (!escrowAddr) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      setErr('Raising dispute · sign in wallet…');
+      await runEscrowAction({ action: 'dispute', contract_address: escrowAddr });
+      setEscrowDone('disputed');
+      setErr('Dispute raised. Platform will review the case; funds stay locked.');
+      persistEscrow({ status: 'disputed' });
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const escrowReset = () => {
+    if (agent && escrowStorageKey) window.localStorage.removeItem(escrowStorageKey);
+    setEscrowAddr(null);
+    setEscrowDone(null);
+    setAnswer(null);
   };
 
   if (loading) return <div className="py-20 text-center text-zinc-500">Loading agent…</div>;
@@ -315,6 +446,38 @@ export default function AgentDetailPage() {
               <article className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
                 <h3 className="mb-2 text-xs font-semibold uppercase text-emerald-400">Result</h3>
                 <pre className="whitespace-pre-wrap font-mono text-sm text-zinc-100">{answer}</pre>
+                {mode === 'escrow' && escrowAddr && !escrowDone && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-3">
+                    <span className="text-xs text-amber-300">
+                      Funds locked in escrow · <code className="font-mono">{escrowAddr.slice(0, 8)}…{escrowAddr.slice(-4)}</code>
+                    </span>
+                    <button
+                      onClick={escrowApprove}
+                      disabled={busy}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
+                    >
+                      Approve &amp; release
+                    </button>
+                    <button
+                      onClick={escrowDispute}
+                      disabled={busy}
+                      className="rounded-lg border border-red-600/50 px-3 py-1.5 text-xs font-medium text-red-300 hover:border-red-400 hover:text-red-200 disabled:opacity-50"
+                    >
+                      Dispute
+                    </button>
+                  </div>
+                )}
+                {escrowDone === 'released' && (
+                  <div className="mt-4 flex items-center gap-2 border-t border-zinc-800 pt-3 text-xs text-emerald-300">
+                    ✅ Payment released to seller.
+                    <button onClick={escrowReset} className="underline hover:text-emerald-200">Hire again</button>
+                  </div>
+                )}
+                {escrowDone === 'disputed' && (
+                  <div className="mt-4 border-t border-zinc-800 pt-3 text-xs text-amber-300">
+                    Dispute raised. Platform will resolve; funds remain in escrow until then.
+                  </div>
+                )}
               </article>
             )}
           </section>

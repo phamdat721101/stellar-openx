@@ -22,6 +22,7 @@ export const FREE_PREVIEW_LIMIT = Number(process.env.FREE_PREVIEW_LIMIT ?? 5);
 export type PaidCallMethod =
   | 'stellar_x402'
   | 'privacy_pool'
+  | 'escrow'
   | 'credit'
   | 'free'
   | 'demo';

@@ -7,22 +7,38 @@ interface Props {
   onChange: (next: PaymentMode) => void;
   basePriceUsdc: string;
   privateMultiplier?: number;
+  escrowMultiplier?: number;
+  escrowEnabled?: boolean;
 }
 
 /**
- * PrivacyModeToggle — buyer-side tier picker.
+ * PrivacyModeToggle — buyer-side tier picker (3 modes).
  *
- * Default is Public (`paywall-router` + plain x402-on-Stellar). Flipping to
- * Private routes through the Privacy Pool, hiding amount + counterparty on
- * Stellar Expert at a 1.5× premium (configurable via env).
+ * Public   → paywall-router, 1× base price, instant settlement.
+ * Private  → Privacy Pool, 1.5× base price, hides counterparty on-chain.
+ * Escrow   → Trustless Work single-release, 2× base price, buyer approves
+ *            or disputes AFTER seeing the answer; 24h seller-claim fallback.
+ *
+ * SOLID (SRP): pure UI, no fetches. Parent owns the mode state.
  */
-export function PrivacyModeToggle({ mode, onChange, basePriceUsdc, privateMultiplier = 1.5 }: Props) {
-  const privatePrice = (Number(basePriceUsdc) * privateMultiplier).toFixed(2);
+export function PrivacyModeToggle({
+  mode,
+  onChange,
+  basePriceUsdc,
+  privateMultiplier = 1.5,
+  escrowMultiplier = 2.0,
+  escrowEnabled = true,
+}: Props) {
+  const base = Number(basePriceUsdc);
+  const privatePrice = (base * privateMultiplier).toFixed(2);
+  const escrowPrice = (base * escrowMultiplier).toFixed(2);
+
   return (
-    <div className="inline-flex rounded-lg border border-zinc-700 p-1 text-sm">
+    <div className="inline-flex flex-wrap gap-1 rounded-lg border border-zinc-700 p-1 text-sm">
       <button
         onClick={() => onChange('public')}
         className={`rounded px-3 py-1 ${mode === 'public' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white'}`}
+        title="Instant settlement; buyer and seller both visible on Stellar Expert"
       >
         Public · ${basePriceUsdc}
       </button>
@@ -33,6 +49,15 @@ export function PrivacyModeToggle({ mode, onChange, basePriceUsdc, privateMultip
       >
         Private · ${privatePrice}
       </button>
+      {escrowEnabled && (
+        <button
+          onClick={() => onChange('escrow')}
+          className={`rounded px-3 py-1 ${mode === 'escrow' ? 'bg-amber-700 text-white' : 'text-zinc-400 hover:text-white'}`}
+          title="Trustless Work escrow — funds held on-chain until you approve the delivered answer (24h auto-release)"
+        >
+          Escrow · ${escrowPrice}
+        </button>
+      )}
     </div>
   );
 }

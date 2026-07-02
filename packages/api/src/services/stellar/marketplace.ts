@@ -122,6 +122,37 @@ export async function getCall(callId: Buffer): Promise<CallSummary | null> {
   };
 }
 
+/**
+ * buildAgentPayoutXdr — seller withdraws their accrued USDC balance from
+ * paid-call-ledger. Contract call: `agent_payout(seller, agent_id, amount)`
+ * with `seller.require_auth()` — the seller's wallet is the tx source, so
+ * Soroban's source-account auth shortcut satisfies the require_auth check
+ * without a separate auth entry (LSP mirror of `buildHireAgentXdr`).
+ *
+ * SOLID (SRP): only builds the tx envelope. Reading the on-chain balance
+ * lives in `getAgentBalance()`; caller composes the two.
+ */
+export async function buildAgentPayoutXdr(
+  seller: string,
+  agentId: Buffer,
+  amountStroops: bigint,
+): Promise<string> {
+  if (amountStroops <= 0n) throw new Error('amountStroops must be > 0');
+  const s = getStellar();
+  const tx = (await s.buildTx(seller))
+    .addOperation(
+      new Contract(s.contracts.paidCallLedger).call(
+        'agent_payout',
+        new Address(seller).toScVal(),
+        nativeToScVal(agentId, { type: 'bytes' }),
+        nativeToScVal(amountStroops, { type: 'i128' }),
+      ),
+    )
+    .build();
+  const prepared = await s.rpc.prepareTransaction(tx);
+  return prepared.toXDR();
+}
+
 // ── Build XDRs (caller signs + submits via SDK payRouter) ────────────────────
 
 export async function buildHireAgentXdr(

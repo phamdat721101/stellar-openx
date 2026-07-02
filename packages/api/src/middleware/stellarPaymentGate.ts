@@ -231,8 +231,73 @@ export async function stellarPaymentGate(
   }
 
   const mode = ((req.headers['x-payment-mode'] as string) ?? 'public').toLowerCase() as PaymentMode;
-  if (mode !== 'public' && mode !== 'private') {
-    res.status(400).json({ error: 'invalid X-PAYMENT-MODE; expected public|private' });
+  if (mode !== 'public' && mode !== 'private' && mode !== 'escrow') {
+    res.status(400).json({ error: 'invalid X-PAYMENT-MODE; expected public|private|escrow' });
+    return;
+  }
+
+  // ── Escrow tier (PRD-T) ──────────────────────────────────────────────────
+  // The buyer has already deployed + funded a Trustless Work escrow. We
+  // treat the funded escrow as the receipt: no 402 challenge, no separate
+  // Stellar tx to verify — the funded state is enforced by the on-chain
+  // TW contract and mirrored in hire_escrows.status = 'funded'.
+  //
+  // NOTE: /api/v1/* is not behind the `auth` middleware (paymentGate IS the
+  // auth). So `req.user` is undefined here — we read `x-stellar-address`
+  // directly and validate its shape before use.
+  if (mode === 'escrow') {
+    const rawAddr = req.headers['x-stellar-address'];
+    const buyer = typeof rawAddr === 'string' && /^G[A-Z2-7]{55}$/.test(rawAddr) ? rawAddr : null;
+    const escrowAddr = (req.headers['x-payment'] as string | undefined)?.replace(/^escrow\s+/, '').trim();
+    if (!buyer || !escrowAddr) {
+      res.status(400).json({
+        error: 'escrow tier requires x-stellar-address + X-PAYMENT: escrow <contract_address>',
+      });
+      return;
+    }
+    const esc = await pool.query(
+      `SELECT id, contract_address, buyer_address, agent_id, status, amount_usdc, answer
+         FROM hire_escrows
+        WHERE contract_address = $1 AND buyer_address = $2 AND agent_id = $3
+        LIMIT 1`,
+      [escrowAddr, buyer, agent.id],
+    );
+    if (esc.rowCount === 0) {
+      res.status(402).json({ error: 'no_funded_escrow_for_this_agent', hint: 'POST /v3/marketplace/escrow/build-action-xdr with action:"deploy"' });
+      return;
+    }
+    const row = esc.rows[0] as {
+      contract_address: string;
+      status: string;
+      amount_usdc: string;
+      answer: string | null;
+    };
+    // The buyer can only cash in a `funded` escrow once — subsequent hits
+    // where status is answered/approved/released just return the cached
+    // answer via the /api/v1 route.
+    if (row.status !== 'funded') {
+      // Idempotent: allow the route to re-serve the cached answer if the
+      // buyer refreshes the page. The route handler checks req.receipt.
+      if (['answered', 'approved', 'released'].includes(row.status) && row.answer) {
+        req.receipt = { tx_hash: row.contract_address, amount_usdc: row.amount_usdc, payment_mode: 'escrow' };
+        next();
+        return;
+      }
+      res.status(402).json({ error: `escrow_not_funded:${row.status}` });
+      return;
+    }
+    await ledger.record({
+      agentId: agent.id,
+      slug: agent.slug,
+      buyer,
+      amountUsdc: row.amount_usdc,
+      txHash: `escrow-${row.contract_address}`,
+      network: NETWORK_TAG,
+      method: 'escrow',
+      sellerId: agent.seller_id ?? null,
+    });
+    req.receipt = { tx_hash: row.contract_address, amount_usdc: row.amount_usdc, payment_mode: 'escrow' };
+    next();
     return;
   }
 

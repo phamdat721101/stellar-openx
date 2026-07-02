@@ -51,6 +51,23 @@ router.post('/:slug', stellarPaymentGate, async (req: StellarPriceableRequest, r
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'agent not found' });
     const answer = await runInference(r.rows[0], question, uploadIds ?? []);
+
+    // Escrow tier — persist answer + timeout so seller can claim on
+    // abandonment and buyer can approve/dispute from /agent/[id].
+    if (req.receipt?.payment_mode === 'escrow' && req.receipt.tx_hash) {
+      try {
+        const { escrowService } = await import('../services/trustlessWork/escrowService');
+        await escrowService.markAnswered({
+          contract_address: req.receipt.tx_hash,
+          answer,
+        });
+      } catch (err) {
+        // Answer already delivered — log and move on. Buyer sees the answer;
+        // the escrow row will re-sync on the next request.
+        logger.warn({ err: (err as Error).message, contract: req.receipt.tx_hash }, 'v1:escrow:markAnswered:failed');
+      }
+    }
+
     res.json({
       ok: true,
       answer,

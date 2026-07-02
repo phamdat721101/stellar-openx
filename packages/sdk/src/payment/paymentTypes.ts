@@ -9,7 +9,7 @@
  * because Stellar tx signing wants structured fields, not opaque tokens.
  */
 
-export type PaymentMode = 'public' | 'private';
+export type PaymentMode = 'public' | 'private' | 'escrow';
 
 export interface StellarPaymentChallenge {
   /** `stellar:testnet` or `stellar:mainnet` */
