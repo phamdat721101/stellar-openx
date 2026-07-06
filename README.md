@@ -32,14 +32,15 @@ A native marketplace where **sellers publish an AI assistant once** and **buyers
 
 ## 💳 Three payment tiers, one wallet
 
-| | 🌐 **Public** | 🕶️ **Private** | 🛡️ **Escrow** |
-|---|:---:|:---:|:---:|
-| **Rate** | 1.0× base | 1.5× base | 2.0× base |
-| **Settles via** | `paywall-router` | Privacy Pool + ZK proof | Trustless Work escrow |
-| **Counterparty on-chain?** | ✅ visible | ❌ hidden | ✅ visible |
-| **Buyer-approval gate?** | ❌ instant | ❌ instant | ✅ buyer signs release |
-| **Wallet signatures** | 1 | 1 + 1 ZK proof | 4 (deploy, fund, approve, release) |
-| **Best for** | microtasks $0.05–$1 | privacy-sensitive | high-value $5+ |
+| | 🌐 **Public** | 🕶️ **Private** | 🛡️ **Escrow** | 💰 **Budget** |
+|---|:---:|:---:|:---:|:---:|
+| **Rate** | 1.0× base | 1.5× base | 2.0× base | 1.0× base |
+| **Settles via** | `paywall-router` (multi-asset) | Privacy Pool + ZK proof | Trustless Work escrow | `budget-vault` (deposit-once) |
+| **Counterparty on-chain?** | ✅ visible | ❌ hidden | ✅ visible | ✅ visible |
+| **Buyer-approval gate?** | ❌ instant | ❌ instant | ✅ buyer signs release | ❌ instant |
+| **Wallet signatures** | 1 | 1 + 1 ZK proof | 4 (deploy, fund, approve, release) | **0 per hire** (1 upfront deposit) |
+| **Assets** | USDC · MGUSD | USDC | USDC | USDC · MGUSD |
+| **Best for** | microtasks $0.05–$1 | privacy-sensitive | high-value $5+ | 10–50 hires/month workflows |
 
 ---
 
@@ -106,8 +107,9 @@ All live on **Stellar testnet**. Copy any address → verify tx history on [Stel
 | Contract | Purpose | Address |
 |---|---|---|
 | **agent-registry** | slug, price, seller, manifest hash | [`CCZHK4EI…4WBH`](https://stellar.expert/explorer/testnet/contract/CCZHK4EIJ35Z2EVYXHXOUQ2YAHAR7LQVRAQHJPAVTUTZOYXM4HDV4WBH) |
-| **paywall-router** | Public-tier 95/5 split settlement | [`CCGK4WJF…4QMV`](https://stellar.expert/explorer/testnet/contract/CCGK4WJFKFUDOXBDMSMMIBAVHZOZ6ME3UQY2WZ4IRN5BXCXJUB6C4QMV) |
+| **paywall-router** | Public-tier 95/5 split settlement (multi-asset) | [`CCGK4WJF…4QMV`](https://stellar.expert/explorer/testnet/contract/CCGK4WJFKFUDOXBDMSMMIBAVHZOZ6ME3UQY2WZ4IRN5BXCXJUB6C4QMV) |
 | **paid-call-ledger** | Per-agent revenue + seller withdraw | [`CCLYNEHM…T2DF`](https://stellar.expert/explorer/testnet/contract/CCLYNEHM7GAZ7ZRD54MGTHU4OWNVJGZB7K7QPJPY4A3ZBOJFTKRXT2DF) |
+| **budget-vault** *(v0.30)* | Deposit-once-hire-many buyer vault (allowlist + caps) | *deployed per-buyer at runtime — see `budget_vaults.contract_address`* |
 
 ### 🔐 Nethermind Privacy Pool (audited, external)
 
@@ -132,6 +134,9 @@ All live on **Stellar testnet**. Copy any address → verify tx history on [Stel
 | Item | Address |
 |---|---|
 | **USDC SAC (Circle testnet)** | [`CBIELTK6…DAMA`](https://stellar.expert/explorer/testnet/contract/CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA) |
+| **USDC SAC (Circle mainnet)** | [`CCW67TSZ…MI75`](https://stellar.expert/explorer/public/contract/CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75) |
+| **MGUSD SAC (M0 testnet · TMGUSD)** *(v0.30)* | [`CCWJCHDL…M7HM`](https://stellar.expert/explorer/testnet/contract/CCWJCHDLXEIMXODO5JFZLRUM7AMA7EI2NBRBL44ROCL6WH44W22NM7HM) |
+| **MGUSD SAC (M0 mainnet)** *(v0.30)* | [`CDK2LDSY…WCJA`](https://stellar.expert/explorer/public/contract/CDK2LDSYUKPEFN3HNE7K7ETUT3VIOBHSOXAK5CTO4A4RKKZQUCAIWCJA) |
 | **Platform Stellar account** | [`GAMURX…L5QZ`](https://stellar.expert/explorer/testnet/account/GAMURX2WC7IUYREU374TEPDLGV3YLK6HUVNTJBP5HYLTQHOCS4A4L5QZ) |
 | **Live API** | [https://api.18-143-233-99.sslip.io](https://api.18-143-233-99.sslip.io/health) |
 
@@ -174,6 +179,7 @@ npm run smoke:all   # cargo + marketplace + privacy-pool + ZK + escrow
 | 🧭 Onboard as an engineer | [`docs/PROJECT_CONTEXT.md`](./docs/PROJECT_CONTEXT.md) |
 | 📐 Product decisions | [`docs/prd/PRD-S-stellar-native-mvp.md`](./docs/prd/PRD-S-stellar-native-mvp.md) |
 | 🔐 Deploy ZK tier | [`docs/runbooks/ZK_DEPLOY.md`](./docs/runbooks/ZK_DEPLOY.md) |
+| 💰 Deploy MGUSD + BudgetVault (v0.30) | [`docs/runbooks/MGUSD_BUDGET_DEPLOY.md`](./docs/runbooks/MGUSD_BUDGET_DEPLOY.md) |
 | 🛡️ Trustless Work integration | [Trustless Work docs](https://docs.trustlesswork.com) |
 | 🌐 Testnet snapshot | [`docs/runbooks/DEPLOY_LIVE.md`](./docs/runbooks/DEPLOY_LIVE.md) |
 | 🏗️ Redeploy Soroban | [`docs/runbooks/STELLAR_DEPLOY.md`](./docs/runbooks/STELLAR_DEPLOY.md) |

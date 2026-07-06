@@ -160,6 +160,7 @@ export async function buildHireAgentXdr(
   agentId: Buffer,
   queryHash: Buffer,
   mode: PaymentMode,
+  assetSac?: string,
 ): Promise<string> {
   const s = getStellar();
   const modeScVal =
@@ -167,18 +168,26 @@ export async function buildHireAgentXdr(
       ? xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('Public')])
       : xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('Private')]);
 
+  // Backward-compat: only send the 5th `asset` arg when the caller explicitly
+  // supplies an asset SAC. Pre-v0.30 deployments of paywall-router expose the
+  // 4-arg `hire_agent(buyer, agent_id, query_hash, mode)` ABI; sending 5 args
+  // would fail. Post-redeploy the contract accepts `asset: Option<Address>` —
+  // callers using MGUSD/etc. pass the SAC and we thread it through.
+  const callArgs: xdr.ScVal[] = [
+    new Address(buyer).toScVal(),
+    nativeToScVal(agentId, { type: 'bytes' }),
+    nativeToScVal(queryHash, { type: 'bytes' }),
+    modeScVal,
+  ];
+  if (assetSac) {
+    callArgs.push(
+      xdr.ScVal.scvVec([xdr.ScVal.scvSymbol('Some'), new Address(assetSac).toScVal()]),
+    );
+  }
+
   const tx = (await s.buildTx(buyer))
-    .addOperation(
-      new Contract(s.contracts.paywallRouter).call(
-        'hire_agent',
-        new Address(buyer).toScVal(),
-        nativeToScVal(agentId, { type: 'bytes' }),
-        nativeToScVal(queryHash, { type: 'bytes' }),
-        modeScVal,
-      ),
-    )
+    .addOperation(new Contract(s.contracts.paywallRouter).call('hire_agent', ...callArgs))
     .build();
-  // Prepare = simulate + restore footprint so the wallet can sign deterministically.
   const prepared = await s.rpc.prepareTransaction(tx);
   return prepared.toXDR();
 }

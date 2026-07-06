@@ -11,11 +11,24 @@
 
 export type PaymentMode = 'public' | 'private' | 'escrow';
 
+/**
+ * Wire-level info about the settlement asset. Backward-compat: prior
+ * clients that never read this field keep working (they'll assume USDC
+ * from the `asset` field). New clients (n-payment, x402 v2 tooling) read
+ * this block for the SAC contract to pass into `hire_agent(..., asset)`.
+ */
+export interface AssetInfo {
+  code: string;              // 'USDC' | 'MGUSD' | 'TMGUSD' …
+  sac_contract: string;      // SEP-41 SAC (C…)
+  precision: number;         // decimals — always 7 for USDC / MGUSD
+  display_name?: string;
+}
+
 export interface StellarPaymentChallenge {
   /** `stellar:testnet` or `stellar:mainnet` */
   network: `stellar:${string}`;
-  /** `USDC` — only asset supported in v3.0.0 */
-  asset: 'USDC';
+  /** Kept for pre-v0.30 clients. Semantically means "the asset's short code". */
+  asset: string;
   /** stroops (7-decimal) as decimal string for safety on the wire */
   amount_stroops: string;
   /** paywall-router or privacy-pool contract id (G…/C…) */
@@ -28,8 +41,10 @@ export interface StellarPaymentChallenge {
   expires_at: number;
   /** echoed back for client convenience */
   payment_mode: PaymentMode;
-  /** human-readable USDC amount, e.g. "1.50" */
+  /** human-readable amount, e.g. "1.50" (any 7-dec asset — USDC or MGUSD) */
   display_amount_usdc: string;
+  /** v0.30+ — structured asset info for multi-asset settlement (optional). */
+  asset_info?: AssetInfo;
 }
 
 export interface StellarPaymentReceipt {

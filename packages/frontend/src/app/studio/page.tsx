@@ -23,6 +23,10 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useStellarWallet } from '@/hooks/useStellarWallet';
 import { useEscrowActions } from '@/hooks/useEscrowActions';
+import { useBudgetVaults, type BudgetVault, type DeployVaultInput } from '@/hooks/useBudgetVaults';
+import BudgetVaultCard from '@/components/BudgetVaultCard';
+import BudgetVaultForm from '@/components/BudgetVaultForm';
+import BudgetVaultAllowlistModal from '@/components/BudgetVaultAllowlistModal';
 import { API_URL, stellarExplorerTxUrl } from '@/lib/stellar';
 
 interface Agent {
@@ -306,6 +310,8 @@ export default function StudioPage() {
 
       {loading && <p className="text-zinc-500">Loading…</p>}
       {error && <p className="text-sm text-red-400">{error}</p>}
+
+      <BudgetAndEarningsSection />
 
       {purchases.length > 0 && (
         <section className="rounded-xl border border-emerald-800/40 bg-emerald-950/10 p-4">
@@ -958,5 +964,209 @@ function StatusPill({ status }: { status: string }) {
     <span className={`rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase ${style}`}>
       {status}
     </span>
+  );
+}
+
+// ─── BudgetVault + Earnings (v0.30 dashboard extension) ───────────────────
+//
+// SOLID (SRP): this in-file section owns rendering the 4-tier + multi-asset
+// dashboard. All logic delegated to the useBudgetVaults hook and the three
+// BudgetVault* components in `packages/frontend/src/components/`.
+
+interface SummaryStats {
+  as_buyer: {
+    active_vaults: number;
+    total_deposited: Record<string, string>;
+    total_spent: Record<string, string>;
+    hires_by_method: Record<string, number>;
+  };
+  as_seller: {
+    total_earned: Record<string, string>;
+    hires_received: number;
+    hires_by_method: Record<string, number>;
+    top_asset: string | null;
+  };
+}
+
+const FEATURE_M2 =
+  (process.env.NEXT_PUBLIC_FEATURE_M2_BUDGET_VAULT ?? 'false').toLowerCase() === 'true';
+
+function BudgetAndEarningsSection() {
+  const { address, network } = useStellarWallet();
+  const budget = useBudgetVaults();
+  const [summary, setSummary] = useState<SummaryStats | null>(null);
+  const [openForm, setOpenForm] = useState<null | { mode: 'create' } | { mode: 'topup' | 'withdraw'; vault: BudgetVault }>(null);
+  const [openAllowlist, setOpenAllowlist] = useState<BudgetVault | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!address || !FEATURE_M2) { setSummary(null); return; }
+    let cancelled = false;
+    fetch(`${API_URL}/v3/marketplace/budget/summary`, { headers: { 'x-stellar-address': address } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled) setSummary(j); })
+      .catch(() => { if (!cancelled) setSummary(null); });
+    return () => { cancelled = true; };
+  }, [address, budget.vaults]);
+
+  if (!FEATURE_M2 || !address) return null;
+
+  const buyer = summary?.as_buyer;
+  const seller = summary?.as_seller;
+  const showSeller = seller && (seller.hires_received > 0 || Object.keys(seller.total_earned).length > 0);
+  const showBuyer = buyer && (buyer.active_vaults > 0 || Object.keys(buyer.total_spent).length > 0);
+
+  const doDeploy = async (input: DeployVaultInput) => {
+    await budget.deploy(input);
+    setFlash(`Vault created (${input.initial_deposit} ${input.asset_code})`);
+    setOpenForm(null);
+  };
+  const doTopup = async (vault: BudgetVault, amount: string) => {
+    await budget.topup(vault.id, amount);
+    setFlash(`Topped up ${amount} ${vault.asset_code}`);
+    setOpenForm(null);
+  };
+  const doWithdraw = async (vault: BudgetVault, amount: string) => {
+    await budget.withdraw(vault.id, amount);
+    setFlash(amount === '0' ? 'Vault fully withdrawn' : `Withdrew ${amount} ${vault.asset_code}`);
+    setOpenForm(null);
+  };
+  const doSetAllowlist = async (vault: BudgetVault, mode: 'any' | 'slugs' | 'sellers', slugs: string[], sellers: string[]) => {
+    await budget.setAllowlist(vault.id, mode, slugs, sellers);
+    setFlash('Allowlist updated on-chain');
+    setOpenAllowlist(null);
+  };
+
+  return (
+    <section className="space-y-4">
+      {/* Earnings & spend summary */}
+      {(showBuyer || showSeller) && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <h2 className="mb-3 text-sm font-semibold text-slate-800">📊 Earnings & spend (30 days)</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {showBuyer && (
+              <div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">You spent</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(Object.entries(buyer!.total_spent).length ? Object.entries(buyer!.total_spent) : [['USDC', '0']]).map(([code, amt]) => (
+                    <div key={code} className="rounded-lg bg-slate-50 p-3">
+                      <div className="font-mono text-lg text-slate-900">{amt}</div>
+                      <div className="text-xs text-slate-500">{code}</div>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  {buyer!.active_vaults} active budget{buyer!.active_vaults === 1 ? '' : 's'} ·{' '}
+                  {Object.entries(buyer!.hires_by_method).map(([m, n]) => `${n} ${m}`).join(' · ') || 'no hires yet'}
+                </p>
+              </div>
+            )}
+            {showSeller && (
+              <div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">You earned</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(Object.entries(seller!.total_earned).length ? Object.entries(seller!.total_earned) : [['USDC', '0']]).map(([code, amt]) => (
+                    <div key={code} className="rounded-lg bg-emerald-50 p-3">
+                      <div className="font-mono text-lg text-slate-900">{amt}</div>
+                      <div className="text-xs text-emerald-700">{code}</div>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  {seller!.hires_received} hire{seller!.hires_received === 1 ? '' : 's'} ·{' '}
+                  {Object.entries(seller!.hires_by_method).map(([m, n]) => `${n} ${m}`).join(' · ')}
+                  {seller!.top_asset ? ` · top: ${seller!.top_asset}` : ''}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Budget vaults grid */}
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-800">💰 Payment budgets ({budget.vaults.length})</h2>
+          <button
+            type="button"
+            onClick={() => setOpenForm({ mode: 'create' })}
+            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+          >
+            + Create budget
+          </button>
+        </div>
+
+        {flash && (
+          <p className="mb-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{flash}</p>
+        )}
+        {budget.error && (
+          <p className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{budget.error}</p>
+        )}
+
+        {budget.loading && budget.vaults.length === 0 ? (
+          <p className="text-xs text-slate-500">Loading vaults…</p>
+        ) : budget.vaults.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
+            No budget vaults yet.{' '}
+            <button onClick={() => setOpenForm({ mode: 'create' })} className="font-medium text-emerald-700 hover:underline">
+              Create your first budget →
+            </button>
+            <p className="mt-1 text-xs text-slate-500">Deposit once, hire many agents without a wallet signature per hire.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {budget.vaults.map((v) => (
+              <BudgetVaultCard
+                key={v.id}
+                vault={v}
+                onTopup={() => setOpenForm({ mode: 'topup', vault: v })}
+                onWithdraw={() => setOpenForm({ mode: 'withdraw', vault: v })}
+                onEditAllowlist={() => setOpenAllowlist(v)}
+                onPause={() => budget.setStatus(v.id, v.status === 'paused' ? 'active' : 'paused').then(() => setFlash('Status updated')).catch((e) => setFlash(e.message))}
+                onClose={() => {
+                  if (confirm('Close this vault permanently? You can still withdraw remaining balance.')) {
+                    budget.setStatus(v.id, 'closed').then(() => setFlash('Vault closed')).catch((e) => setFlash(e.message));
+                  }
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {openForm?.mode === 'create' && (
+        <BudgetVaultForm
+          mode="create"
+          network={network}
+          onSubmit={(input) => doDeploy(input.deploy!)}
+          onCancel={() => setOpenForm(null)}
+        />
+      )}
+      {openForm && openForm.mode === 'topup' && (
+        <BudgetVaultForm
+          mode="topup"
+          vault={openForm.vault}
+          network={network}
+          onSubmit={(input) => doTopup(openForm.vault, input.amount!)}
+          onCancel={() => setOpenForm(null)}
+        />
+      )}
+      {openForm && openForm.mode === 'withdraw' && (
+        <BudgetVaultForm
+          mode="withdraw"
+          vault={openForm.vault}
+          network={network}
+          onSubmit={(input) => doWithdraw(openForm.vault, input.amount!)}
+          onCancel={() => setOpenForm(null)}
+        />
+      )}
+      {openAllowlist && (
+        <BudgetVaultAllowlistModal
+          vault={openAllowlist}
+          onSubmit={(mode, slugs, sellers) => doSetAllowlist(openAllowlist, mode, slugs, sellers)}
+          onCancel={() => setOpenAllowlist(null)}
+        />
+      )}
+    </section>
   );
 }

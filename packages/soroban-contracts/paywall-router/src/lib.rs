@@ -120,6 +120,7 @@ impl PaywallRouter {
         agent_id: BytesN<32>,
         query_hash: BytesN<32>,
         mode: PaymentMode,
+        asset: Option<Address>,
     ) -> BytesN<32> {
         buyer.require_auth();
         if matches!(mode, PaymentMode::Private) {
@@ -129,7 +130,13 @@ impl PaywallRouter {
         let agent: AgentLite = RegistryClient::new(&env, &registry).get_agent(&agent_id);
 
         let ledger: Address = env.storage().instance().get(&DataKey::Ledger).unwrap();
-        let usdc: Address = env.storage().instance().get(&DataKey::UsdcSac).unwrap();
+        // Asset resolution: caller-supplied SAC (any SEP-41) OR the stored
+        // default (USDC). Preserves byte-identical behaviour for every
+        // pre-v0.30 caller — they pass `None` and get the historical USDC
+        // rail. v0.30+ callers pass `Some(mgusd_sac)` to settle in MGUSD.
+        let sac: Address = asset.unwrap_or_else(|| {
+            env.storage().instance().get(&DataKey::UsdcSac).unwrap()
+        });
         let treasury: Address = env.storage().instance().get(&DataKey::Treasury).unwrap();
         let bp: u32 = env.storage().instance().get(&DataKey::PlatformBp).unwrap();
 
@@ -137,7 +144,8 @@ impl PaywallRouter {
         let platform = (gross * bp as i128) / 10_000;
         let seller_share = gross - platform;
 
-        let token_client = token::Client::new(&env, &usdc);
+        // Any SEP-41 SAC exposes the same `token` interface — no branch needed.
+        let token_client = token::Client::new(&env, &sac);
         token_client.transfer(&buyer, &ledger, &seller_share);
         if platform > 0 {
             token_client.transfer(&buyer, &treasury, &platform);

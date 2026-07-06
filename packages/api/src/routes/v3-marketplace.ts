@@ -244,7 +244,23 @@ router.post('/submit', async (req: AuthRequest, res: Response) => {
     let attempt = 0;
     while (attempt < 30) {
       const r = await s.rpc.getTransaction(sendRes.hash);
-      if (r.status === 'SUCCESS') return res.json({ tx_hash: sendRes.hash, ledger: r.ledger });
+      if (r.status === 'SUCCESS') {
+        // If this tx created a contract, extract the resulting contract id
+        // from the return value so the client can use it in follow-up calls
+        // (e.g. BudgetVault deploy → init).
+        let contract_id: string | undefined;
+        try {
+          const rv = (r as { returnValue?: { toXDR?: () => Buffer } }).returnValue;
+          if (rv) {
+            const { scValToNative } = await import('@stellar/stellar-sdk');
+            const decoded = scValToNative(rv as never);
+            if (typeof decoded === 'string' && /^C[A-Z0-9]{55}$/.test(decoded)) {
+              contract_id = decoded;
+            }
+          }
+        } catch { /* not a contract-returning tx */ }
+        return res.json({ tx_hash: sendRes.hash, ledger: r.ledger, contract_id });
+      }
       if (r.status === 'FAILED') return res.status(400).json({ error: 'tx_failed', tx_hash: sendRes.hash });
       await new Promise((r) => setTimeout(r, 1_000));
       attempt += 1;
@@ -663,6 +679,166 @@ router.post('/seller/agent/:id/archive', async (req: AuthRequest, res: Response)
   );
   if (r.rowCount === 0) return res.status(404).json({ error: 'agent not found / not owner' });
   res.json({ ok: true });
+});
+
+// ─── BudgetVault — PRD-M2 (deposit-once-hire-many) ────────────────────────
+//
+// All routes flag-gated on FEATURE_M2_BUDGET_VAULT; when disabled they 404
+// (byte-identical to a route that doesn't exist). Buyer-only surface.
+
+import * as budgetVault from '../services/stellar/budgetVault';
+
+function requireBudgetFlag(_req: AuthRequest, res: Response, next: () => void): void {
+  if (process.env.FEATURE_M2_BUDGET_VAULT !== 'true') {
+    res.status(404).json({ error: 'feature_disabled' });
+    return;
+  }
+  next();
+}
+
+router.post('/budget/deploy', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
+  try {
+    const out = await budgetVault.buildDeployXdr({
+      buyer: req.user.address,
+      asset_code: req.body?.asset_code ?? 'USDC',
+      total_cap: req.body?.total_cap ?? null,
+      per_hire_cap: req.body?.per_hire_cap ?? null,
+      allowlist_mode: req.body?.allowlist_mode ?? 'any',
+      allowlist: Array.isArray(req.body?.allowlist) ? req.body.allowlist : [],
+      initial_deposit: String(req.body?.initial_deposit ?? '0'),
+    });
+    res.json(out);
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'budget:deploy:failed');
+    res.status(400).json({ error: 'deploy_build_failed', detail: (err as Error).message.slice(0, 200) });
+  }
+});
+
+router.post('/budget/confirm-deploy', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
+  const { vault_placeholder_id, tx_hash } = req.body ?? {};
+  if (!vault_placeholder_id || !tx_hash) return res.status(400).json({ error: 'vault_placeholder_id + tx_hash required' });
+  try {
+    const row = await budgetVault.confirmDeploy({ vault_placeholder_id, tx_hash });
+    res.json(row);
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'budget:confirm:failed');
+    res.status(400).json({ error: 'confirm_failed', detail: (err as Error).message.slice(0, 200) });
+  }
+});
+
+router.post('/budget/:id/init', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
+  try {
+    const out = await budgetVault.buildInitXdr({
+      vault_placeholder_id: req.params.id,
+      buyer: req.user.address,
+      contract_address: req.body?.contract_address,
+    });
+    res.json(out);
+  } catch (err) {
+    logger.warn({ err: (err as Error).message, id: req.params.id }, 'budget:init:failed');
+    res.status(400).json({ error: 'init_build_failed', detail: (err as Error).message.slice(0, 200) });
+  }
+});
+
+router.get('/budget/me', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
+  const rows = await budgetVault.listMyVaults(req.user.address);
+  res.json({ vaults: rows });
+});
+
+router.get('/budget/summary', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
+  const summary = await budgetVault.getSummary(req.user.address);
+  res.json(summary);
+});
+
+router.get('/budget/:id/hires', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
+  const hires = await budgetVault.listVaultHires({
+    vaultId: req.params.id,
+    limit: req.query.limit ? Number(req.query.limit) : undefined,
+    cursor: req.query.cursor ? Number(req.query.cursor) : undefined,
+  });
+  res.json({ hires });
+});
+
+async function loadOwnedVault(req: AuthRequest, res: Response): Promise<{ vault: budgetVault.BudgetVaultRow } | null> {
+  if (!req.user?.address) { res.status(401).json({ error: 'auth required' }); return null; }
+  const r = await pool.query<budgetVault.BudgetVaultRow>(
+    `SELECT * FROM budget_vaults WHERE id = $1 AND buyer_address = $2 LIMIT 1`,
+    [req.params.id, req.user.address],
+  );
+  if (r.rowCount === 0) { res.status(404).json({ error: 'vault_not_found' }); return null; }
+  return { vault: r.rows[0] };
+}
+
+router.post('/budget/:id/topup', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  const ctx = await loadOwnedVault(req, res); if (!ctx) return;
+  const amount = String(req.body?.amount ?? '0');
+  if (Number(amount) <= 0) return res.status(400).json({ error: 'amount must be > 0' });
+  try {
+    const xdr = await budgetVault.buildTopupXdr(req.user!.address, ctx.vault.contract_address, amount);
+    res.json({ xdr, contract_address: ctx.vault.contract_address });
+  } catch (err) {
+    res.status(500).json({ error: 'build_failed', detail: (err as Error).message.slice(0, 200) });
+  }
+});
+
+router.post('/budget/:id/withdraw', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  const ctx = await loadOwnedVault(req, res); if (!ctx) return;
+  const amount = String(req.body?.amount ?? '0'); // '0' means withdraw-all per contract
+  try {
+    const xdr = await budgetVault.buildWithdrawXdr(req.user!.address, ctx.vault.contract_address, amount);
+    res.json({ xdr, contract_address: ctx.vault.contract_address });
+  } catch (err) {
+    res.status(500).json({ error: 'build_failed', detail: (err as Error).message.slice(0, 200) });
+  }
+});
+
+router.post('/budget/:id/allowlist', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  const ctx = await loadOwnedVault(req, res); if (!ctx) return;
+  const mode = String(req.body?.mode ?? 'any') as 'any' | 'slugs' | 'sellers';
+  const slugs: string[] = Array.isArray(req.body?.slugs) ? req.body.slugs : [];
+  const sellers: string[] = Array.isArray(req.body?.sellers) ? req.body.sellers : [];
+  try {
+    const xdr = await budgetVault.buildSetAllowlistXdr(req.user!.address, ctx.vault.contract_address, mode, slugs, sellers);
+    res.json({ xdr, contract_address: ctx.vault.contract_address });
+  } catch (err) {
+    res.status(500).json({ error: 'build_failed', detail: (err as Error).message.slice(0, 200) });
+  }
+});
+
+router.post('/budget/:id/status', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  const ctx = await loadOwnedVault(req, res); if (!ctx) return;
+  const status = String(req.body?.status ?? 'active') as 'active' | 'paused' | 'closed';
+  try {
+    const xdr = await budgetVault.buildSetStatusXdr(req.user!.address, ctx.vault.contract_address, status);
+    res.json({ xdr, contract_address: ctx.vault.contract_address });
+  } catch (err) {
+    res.status(500).json({ error: 'build_failed', detail: (err as Error).message.slice(0, 200) });
+  }
+});
+
+/**
+ * After the buyer submits the signed XDR for topup / withdraw / allowlist,
+ * they hit this endpoint so we can sync the DB mirror (status, cache).
+ * Idempotent — safe to retry.
+ */
+router.post('/budget/:id/refresh', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
+  const ctx = await loadOwnedVault(req, res); if (!ctx) return;
+  try {
+    const balance = await budgetVault.getOnChainBalance(ctx.vault.contract_address);
+    const r = await pool.query<budgetVault.BudgetVaultRow>(
+      `UPDATE budget_vaults SET balance_cache = $1, balance_cached_at = NOW() WHERE id = $2 RETURNING *`,
+      [balance, ctx.vault.id],
+    );
+    res.json(r.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'refresh_failed', detail: (err as Error).message.slice(0, 200) });
+  }
 });
 
 export default router;

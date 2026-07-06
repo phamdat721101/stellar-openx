@@ -24,4 +24,16 @@ npx tsx scripts/smoke-coinflow-stellar-e2e.ts
 echo "▶︎ smoke: trustless-work escrow (PRD-T)"
 npx tsx scripts/smoke-trustless-escrow-e2e.ts
 
+# v0.30 — MGUSD × x402 v2 + BudgetVault suites gated behind RUN_MGUSD=1
+# so CI stays green when the M0 testnet faucet is unavailable.
+if [ "${RUN_MGUSD:-0}" = "1" ]; then
+  echo "▶︎ smoke: MGUSD × x402 v2 challenge shape (PRD-M1)"
+  npx tsx scripts/smoke-mgusd-x402-e2e.ts
+
+  if [ -f scripts/smoke-budget-vault-e2e.ts ]; then
+    echo "▶︎ smoke: BudgetVault deposit → hire → withdraw (PRD-M2)"
+    npx tsx scripts/smoke-budget-vault-e2e.ts
+  fi
+fi
+
 echo "✅ all smokes green"

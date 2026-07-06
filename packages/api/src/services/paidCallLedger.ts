@@ -23,6 +23,7 @@ export type PaidCallMethod =
   | 'stellar_x402'
   | 'privacy_pool'
   | 'escrow'
+  | 'budget_vault'
   | 'credit'
   | 'free'
   | 'demo';
@@ -38,13 +39,18 @@ export interface PaidCallRecord {
   sellerId?: number | null;
   /** ZK commitment (privacy tier) — enables replay protection via unique index. */
   zkCommitment?: string | null;
+  /** v0.30 — asset that actually settled (defaults 'USDC' when omitted). */
+  assetCode?: string;
+  /** v0.30 — BudgetVault contract id when settled from a vault, else null. */
+  vaultId?: string | null;
 }
 
 export async function record(call: PaidCallRecord): Promise<boolean> {
   const r = await pool.query(
-    `INSERT INTO paid_calls (agent_id, slug, buyer, amount_usdc, tx_hash, network, method, zk_commitment)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (network, tx_hash) DO NOTHING
+    `INSERT INTO paid_calls
+       (agent_id, slug, buyer, amount_usdc, tx_hash, network, method, zk_commitment, asset_code, vault_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (network, tx_hash) DO NOTHING
      RETURNING id`,
     [
       call.agentId,
@@ -55,11 +61,16 @@ export async function record(call: PaidCallRecord): Promise<boolean> {
       call.network,
       call.method,
       call.zkCommitment ?? null,
+      (call.assetCode ?? 'USDC').toUpperCase(),
+      call.vaultId ?? null,
     ],
   );
   const fresh = (r.rowCount ?? 0) > 0;
   if (fresh) {
-    logger.info({ slug: call.slug, txHash: call.txHash, method: call.method }, 'paidCall:recorded');
+    logger.info(
+      { slug: call.slug, txHash: call.txHash, method: call.method, asset: call.assetCode ?? 'USDC' },
+      'paidCall:recorded',
+    );
     await notifyService.notify(
       call.agentId,
       'paid_call.completed',
@@ -71,6 +82,8 @@ export async function record(call: PaidCallRecord): Promise<boolean> {
         tx_hash: call.txHash,
         network: call.network,
         method: call.method,
+        asset_code: call.assetCode ?? 'USDC',
+        vault_id: call.vaultId ?? null,
       },
       `paid_call:${call.network}:${call.txHash}`,
     );

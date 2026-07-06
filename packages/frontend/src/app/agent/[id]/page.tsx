@@ -26,6 +26,7 @@ import { PrivacyModeToggle } from '@/components/PrivacyModeToggle';
 import { useStellarWallet } from '@/hooks/useStellarWallet';
 import { useConnectedPrivacyMode } from '@/hooks/useConnectedPrivacyMode';
 import { useEscrowActions } from '@/hooks/useEscrowActions';
+import { useBudgetVaults } from '@/hooks/useBudgetVaults';
 import { API_URL, fmtUsdcAmount, stellarExplorerTxUrl } from '@/lib/stellar';
 import {
   hireAgentIdField,
@@ -70,6 +71,10 @@ export default function AgentDetailPage() {
   // survive answer scrolling / page refreshes via localStorage.
   const [escrowAddr, setEscrowAddr] = useState<string | null>(null);
   const [escrowDone, setEscrowDone] = useState<'approved' | 'released' | 'disputed' | null>(null);
+  // v0.30 — BudgetVault "pay from budget" toggle. When a vault id is selected
+  // the hire() flow bypasses XDR signing entirely (server-side debit).
+  const budget = useBudgetVaults();
+  const [selectedVaultId, setSelectedVaultId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!id) return;
@@ -105,6 +110,36 @@ export default function AgentDetailPage() {
     // funded on-chain escrow IS the receipt). Dispatch here.
     if (mode === 'escrow') {
       void hireEscrow();
+      return;
+    }
+    // v0.30 PRD-M2 — pay from BudgetVault. Zero wallet signatures — server
+    // relays the debit_for_hire on-chain with allowlist + cap enforcement.
+    if (selectedVaultId) {
+      const vault = budget.vaults.find((v) => v.id === selectedVaultId);
+      if (!vault) { setErr('Selected vault not found — pick another or refresh'); return; }
+      setBusy(true); setErr(null); setAnswer(null);
+      try {
+        const r = await fetch(`${API_URL}/api/v1/${agent.slug}`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-stellar-address': address,
+            'x-budget-vault': vault.contract_address,
+            'x-preferred-asset': vault.asset_code,
+          },
+          body: JSON.stringify({ question }),
+        });
+        if (!r.ok) {
+          const errJson = await r.json().catch(() => ({} as { error?: string }));
+          throw new Error(errJson.error ?? `hire failed: ${r.status}`);
+        }
+        const j = (await r.json()) as { answer: string };
+        setAnswer(j.answer);
+        void budget.refresh();
+        void refresh();
+      } catch (e) {
+        setErr((e as Error).message);
+      } finally { setBusy(false); }
       return;
     }
     setBusy(true);
@@ -403,6 +438,40 @@ export default function AgentDetailPage() {
               <h2 className="font-semibold">Hire this agent</h2>
               <PrivacyModeToggle mode={mode} onChange={setMode} basePriceUsdc={price} />
             </div>
+            {budget.vaults.filter((v) => v.status === 'active' && Number(v.balance_cache ?? 0) > 0).length > 0 && (
+              <div className="rounded-lg border border-emerald-800/40 bg-emerald-950/20 p-3 text-xs">
+                <label className="flex items-center gap-2 text-emerald-200">
+                  <input
+                    type="checkbox"
+                    checked={!!selectedVaultId}
+                    onChange={(e) => {
+                      if (!e.target.checked) { setSelectedVaultId(null); return; }
+                      const first = budget.vaults.find((v) => v.status === 'active' && Number(v.balance_cache ?? 0) >= Number(price));
+                      setSelectedVaultId(first?.id ?? null);
+                    }}
+                    className="rounded border-emerald-700 bg-emerald-900 text-emerald-500 focus:ring-emerald-500"
+                  />
+                  <span className="font-medium">💰 Pay from budget vault</span>
+                  <span className="text-emerald-400">(zero wallet signatures)</span>
+                </label>
+                {selectedVaultId && (
+                  <select
+                    value={selectedVaultId}
+                    onChange={(e) => setSelectedVaultId(e.target.value)}
+                    className="mt-2 block w-full rounded border-emerald-800 bg-zinc-950 px-2 py-1 font-mono text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                  >
+                    {budget.vaults
+                      .filter((v) => v.status === 'active')
+                      .map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.contract_address.slice(0, 10)}… — {v.balance_cache ?? '0'} {v.asset_code}
+                          {Number(v.balance_cache ?? 0) < Number(price) ? ' ⚠ low balance' : ''}
+                        </option>
+                      ))}
+                  </select>
+                )}
+              </div>
+            )}
             <textarea
               value={question}
               onChange={(e) => setQuestion(e.target.value)}

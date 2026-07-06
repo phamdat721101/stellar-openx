@@ -37,10 +37,42 @@ export const STELLAR_USDC_SAC: Record<StellarNetwork, string> = {
 };
 
 /**
+ * MGUSD SEP-41 SACs — MoneyGram × M0 stablecoin.
+ * Source (M0 canonical): https://docs.m0.org/resources/addresses/mgusd-platform
+ *
+ * Asset codes: testnet uses `TMGUSD`, mainnet uses `MGUSD`. Both are
+ * 7-decimal SEP-41 compliant — same stroop math as USDC.
+ */
+export const STELLAR_MGUSD_SAC: Record<StellarNetwork, string> = {
+  testnet: 'CCWJCHDLXEIMXODO5JFZLRUM7AMA7EI2NBRBL44ROCL6WH44W22NM7HM',
+  mainnet: 'CDK2LDSYUKPEFN3HNE7K7ETUT3VIOBHSOXAK5CTO4A4RKKZQUCAIWCJA',
+};
+export const STELLAR_MGUSD_CODE: Record<StellarNetwork, string> = {
+  testnet: 'TMGUSD',
+  mainnet: 'MGUSD',
+};
+
+/** All SEP-41 assets known to the SDK. Extend here when adding new stablecoins. */
+export const STELLAR_KNOWN_ASSETS: Record<StellarNetwork, Record<string, string>> = {
+  testnet: {
+    USDC: STELLAR_USDC_SAC.testnet,
+    TMGUSD: STELLAR_MGUSD_SAC.testnet,
+  },
+  mainnet: {
+    USDC: STELLAR_USDC_SAC.mainnet,
+    MGUSD: STELLAR_MGUSD_SAC.mainnet,
+  },
+};
+
+/**
  * Stroops per USDC. Stellar uses 7-decimal accounting natively; the USDC SAC
  * follows the same convention. 1.50 USDC = 15_000_000 stroops.
+ *
+ * Same math applies to MGUSD (also 7-decimal SEP-41).
  */
 export const STROOPS_PER_USDC = 10_000_000n;
+/** Alias for readability when working with non-USDC 7-decimal assets. */
+export const STROOPS_PER_ASSET = STROOPS_PER_USDC;
 
 /** USDC display → stroops bigint. Truncates at 7 decimals. */
 export function usdcToStroops(amount: string | number): bigint {

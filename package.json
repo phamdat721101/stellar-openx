@@ -29,6 +29,8 @@
     "smoke:coinflow-stellar": "tsx scripts/smoke-coinflow-stellar-e2e.ts",
     "smoke:translator-e2e": "tsx scripts/smoke-translator-e2e.ts",
     "smoke:credit-e2e": "tsx scripts/smoke-credit-e2e.ts",
+    "smoke:mgusd-x402": "tsx scripts/smoke-mgusd-x402-e2e.ts",
+    "smoke:budget-vault": "tsx scripts/smoke-budget-vault-e2e.ts",
     "smoke:all": "bash scripts/run-all-smokes.sh",
     "seed:translator": "tsx scripts/seed-translator-agent.ts",
     "db:migrate": "bash -c 'for f in packages/shared/migrations/*.sql; do psql \"$DATABASE_URL\" -f \"$f\" || true; done'",

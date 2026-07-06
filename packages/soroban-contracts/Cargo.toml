@@ -19,6 +19,7 @@ members = [
     "agent-registry",
     "paywall-router",
     "paid-call-ledger",
+    "budget-vault",
 ]
 
 [workspace.package]
