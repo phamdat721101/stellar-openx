@@ -50,30 +50,56 @@ interface State {
   error: string | null;
 }
 
+export interface YieldSummary {
+  total_earned_stroops: string;
+  this_month_stroops: string;
+  active_vaults_with_boost: number;
+  next_epoch_at: string;
+  base_apy_bp: number;
+  boost_apy_bp: number;
+  boost_days: number;
+}
+
 const POLL_MS = 30_000;
+const YIELD_ENABLED = process.env.NEXT_PUBLIC_FEATURE_M2_VAULT_YIELD === 'true';
 
 export function useBudgetVaults() {
   const { address, signTransaction } = useStellarWallet();
   const [state, setState] = useState<State>({ vaults: [], loading: false, error: null });
+  const [yieldSummary, setYieldSummary] = useState<YieldSummary | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!address) { setState({ vaults: [], loading: false, error: null }); return; }
+    if (!address) { setState({ vaults: [], loading: false, error: null }); setYieldSummary(null); return; }
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      const r = await fetch(`${API_URL}/v3/marketplace/budget/me`, {
-        headers: { 'x-stellar-address': address },
-        signal: ac.signal,
-      });
-      if (!r.ok) {
-        if (r.status === 404) { setState({ vaults: [], loading: false, error: null }); return; }
-        throw new Error(`GET /budget/me → ${r.status}`);
+      const [vaultsRes, yieldRes] = await Promise.all([
+        fetch(`${API_URL}/v3/marketplace/budget/me`, {
+          headers: { 'x-stellar-address': address },
+          signal: ac.signal,
+        }),
+        YIELD_ENABLED
+          ? fetch(`${API_URL}/v3/marketplace/budget/rewards/summary`, {
+              headers: { 'x-stellar-address': address },
+              signal: ac.signal,
+            }).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+      if (!vaultsRes.ok) {
+        if (vaultsRes.status === 404) { setState({ vaults: [], loading: false, error: null }); return; }
+        throw new Error(`GET /budget/me → ${vaultsRes.status}`);
       }
-      const j = (await r.json()) as { vaults: BudgetVault[] };
+      const j = (await vaultsRes.json()) as { vaults: BudgetVault[] };
       setState({ vaults: j.vaults ?? [], loading: false, error: null });
+      if (yieldRes && yieldRes.ok) {
+        const y = (await yieldRes.json()) as { data: YieldSummary };
+        setYieldSummary(y.data ?? null);
+      } else {
+        setYieldSummary(null);
+      }
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
       setState((s) => ({ ...s, loading: false, error: (err as Error).message }));
@@ -160,5 +186,5 @@ export function useBudgetVaults() {
     [refresh, signTransaction],
   );
 
-  return { ...state, refresh, deploy, topup, withdraw, setAllowlist, setStatus };
+  return { ...state, refresh, deploy, topup, withdraw, setAllowlist, setStatus, yieldSummary };
 }

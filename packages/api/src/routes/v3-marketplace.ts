@@ -755,6 +755,41 @@ router.get('/budget/summary', requireBudgetFlag, async (req: AuthRequest, res: R
   res.json(summary);
 });
 
+// ── PRD-N BudgetVault v0.31 yield-reward read routes ──────────────────────
+function requireYieldFlag(_req: AuthRequest, res: Response, next: () => void): void {
+  if (process.env.FEATURE_M2_VAULT_YIELD !== 'true') {
+    res.status(404).json({ error: 'feature_disabled' });
+    return;
+  }
+  next();
+}
+
+router.get('/budget/rewards/summary', requireBudgetFlag, requireYieldFlag, async (req: AuthRequest, res: Response) => {
+  if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
+  try {
+    const { getBuyerRewardSummary } = await import('../services/stellar/vaultRewards');
+    const out = await getBuyerRewardSummary(req.user.address);
+    res.json(out);
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'yield:summary:failed');
+    res.status(500).json({ error: 'summary_failed' });
+  }
+});
+
+router.get('/budget/:id/rewards', requireBudgetFlag, requireYieldFlag, async (req: AuthRequest, res: Response) => {
+  if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
+  try {
+    const { listVaultRewards } = await import('../services/stellar/vaultRewards');
+    const limit = Math.min(Number(req.query.limit ?? 50), 200);
+    const offset = Math.max(Number(req.query.offset ?? 0), 0);
+    const rows = await listVaultRewards(req.params.id, req.user.address, limit, offset);
+    res.json({ success: true, data: rows, meta: { limit, offset, total: rows.length } });
+  } catch (err) {
+    logger.warn({ err: (err as Error).message, id: req.params.id }, 'yield:list:failed');
+    res.status(500).json({ error: 'list_failed' });
+  }
+});
+
 router.get('/budget/:id/hires', requireBudgetFlag, async (req: AuthRequest, res: Response) => {
   if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
   const hires = await budgetVault.listVaultHires({

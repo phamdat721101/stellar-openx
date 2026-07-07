@@ -111,4 +111,20 @@ setInterval(async () => {
   }
 }, STALE_INTERVAL_MS).unref();
 
+// PRD-N BudgetVault v0.31 yield-reward cron — ticks hourly; each vault is
+// credited at most once per (epoch_start) thanks to UNIQUE index on
+// vault_reward_epochs. No-op when either cascading flag is off.
+const YIELD_INTERVAL_MS = 60 * 60 * 1000;
+if (process.env.FEATURE_M2_BUDGET_VAULT === 'true' && process.env.FEATURE_M2_VAULT_YIELD === 'true') {
+  setInterval(async () => {
+    try {
+      const { runRewardEpoch } = await import('./services/stellar/vaultRewards');
+      await runRewardEpoch();
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, 'yield:cron:tick:failed');
+    }
+  }, YIELD_INTERVAL_MS).unref();
+  logger.info({ interval_ms: YIELD_INTERVAL_MS }, 'yield:cron:enabled');
+}
+
 installLifecycle(server);

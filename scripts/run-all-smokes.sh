@@ -36,4 +36,13 @@ if [ "${RUN_MGUSD:-0}" = "1" ]; then
   fi
 fi
 
+# v0.31 — BudgetVault yield-rewards (PRD-N) gated behind RUN_YIELD=1.
+# Pure math kernel + HTTP route shape assertions — no on-chain funds required.
+if [ "${RUN_YIELD:-0}" = "1" ]; then
+  if [ -f scripts/smoke-vault-rewards-e2e.ts ]; then
+    echo "▶︎ smoke: BudgetVault yield-rewards (PRD-N)"
+    npx tsx scripts/smoke-vault-rewards-e2e.ts
+  fi
+fi
+
 echo "✅ all smokes green"

@@ -990,6 +990,17 @@ interface SummaryStats {
 
 const FEATURE_M2 =
   (process.env.NEXT_PUBLIC_FEATURE_M2_BUDGET_VAULT ?? 'false').toLowerCase() === 'true';
+const FEATURE_M2_YIELD =
+  (process.env.NEXT_PUBLIC_FEATURE_M2_VAULT_YIELD ?? 'false').toLowerCase() === 'true';
+
+function fmtStroops(stroops: string | null | undefined): string {
+  if (!stroops || stroops === '0') return '0';
+  const s = BigInt(stroops);
+  const whole = s / 10_000_000n;
+  const frac = s % 10_000_000n;
+  if (frac === 0n) return whole.toString();
+  return `${whole}.${frac.toString().padStart(7, '0').replace(/0+$/, '')}`;
+}
 
 function BudgetAndEarningsSection() {
   const { address, network } = useStellarWallet();
@@ -1043,7 +1054,7 @@ function BudgetAndEarningsSection() {
       {(showBuyer || showSeller) && (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <h2 className="mb-3 text-sm font-semibold text-slate-800">📊 Earnings & spend (30 days)</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className={`grid grid-cols-1 gap-4 ${FEATURE_M2_YIELD && budget.yieldSummary ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
             {showBuyer && (
               <div>
                 <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">You spent</p>
@@ -1076,6 +1087,19 @@ function BudgetAndEarningsSection() {
                   {seller!.hires_received} hire{seller!.hires_received === 1 ? '' : 's'} ·{' '}
                   {Object.entries(seller!.hires_by_method).map(([m, n]) => `${n} ${m}`).join(' · ')}
                   {seller!.top_asset ? ` · top: ${seller!.top_asset}` : ''}
+                </p>
+              </div>
+            )}
+            {FEATURE_M2_YIELD && budget.yieldSummary && (
+              <div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">🌾 Yield earned</p>
+                <div className="rounded-lg bg-emerald-50 p-3">
+                  <div className="font-mono text-lg text-slate-900">+{fmtStroops(budget.yieldSummary.this_month_stroops)}</div>
+                  <div className="text-xs text-emerald-700">this month</div>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  {budget.yieldSummary.active_vaults_with_boost} vault{budget.yieldSummary.active_vaults_with_boost === 1 ? '' : 's'} on {(budget.yieldSummary.boost_apy_bp / 100).toFixed(0)}% boost
+                  {' · '}base {(budget.yieldSummary.base_apy_bp / 100).toFixed(0)}%
                 </p>
               </div>
             )}
@@ -1115,21 +1139,42 @@ function BudgetAndEarningsSection() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {budget.vaults.map((v) => (
-              <BudgetVaultCard
-                key={v.id}
-                vault={v}
-                onTopup={() => setOpenForm({ mode: 'topup', vault: v })}
-                onWithdraw={() => setOpenForm({ mode: 'withdraw', vault: v })}
-                onEditAllowlist={() => setOpenAllowlist(v)}
-                onPause={() => budget.setStatus(v.id, v.status === 'paused' ? 'active' : 'paused').then(() => setFlash('Status updated')).catch((e) => setFlash(e.message))}
-                onClose={() => {
-                  if (confirm('Close this vault permanently? You can still withdraw remaining balance.')) {
-                    budget.setStatus(v.id, 'closed').then(() => setFlash('Vault closed')).catch((e) => setFlash(e.message));
-                  }
-                }}
-              />
-            ))}
+            {budget.vaults.map((v) => {
+              const y = budget.yieldSummary;
+              const boostDaysRemaining = y
+                ? Math.max(0, y.boost_days - Math.floor((Date.now() - new Date(v.created_at).getTime()) / 86_400_000))
+                : 0;
+              const apyBp = y ? (boostDaysRemaining > 0 ? y.boost_apy_bp : y.base_apy_bp) : 0;
+              // For v0.31.0, per-vault month share = aggregate / active_vaults (safe average).
+              // A precise per-vault split lands in v0.31.1 via GET /budget/:id/rewards.
+              const monthPer = y && buyer && buyer.active_vaults > 0
+                ? (BigInt(y.this_month_stroops) / BigInt(buyer.active_vaults)).toString()
+                : '0';
+              const totalPer = y && buyer && buyer.active_vaults > 0
+                ? (BigInt(y.total_earned_stroops) / BigInt(buyer.active_vaults)).toString()
+                : '0';
+              return (
+                <BudgetVaultCard
+                  key={v.id}
+                  vault={v}
+                  reward={FEATURE_M2_YIELD && y && v.status === 'active' ? {
+                    monthStroops: monthPer,
+                    totalStroops: totalPer,
+                    apyBp,
+                    boostDaysRemaining,
+                  } : undefined}
+                  onTopup={() => setOpenForm({ mode: 'topup', vault: v })}
+                  onWithdraw={() => setOpenForm({ mode: 'withdraw', vault: v })}
+                  onEditAllowlist={() => setOpenAllowlist(v)}
+                  onPause={() => budget.setStatus(v.id, v.status === 'paused' ? 'active' : 'paused').then(() => setFlash('Status updated')).catch((e) => setFlash(e.message))}
+                  onClose={() => {
+                    if (confirm('Close this vault permanently? You can still withdraw remaining balance.')) {
+                      budget.setStatus(v.id, 'closed').then(() => setFlash('Vault closed')).catch((e) => setFlash(e.message));
+                    }
+                  }}
+                />
+              );
+            })}
           </div>
         )}
       </div>

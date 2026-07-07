@@ -517,6 +517,15 @@ export async function getSummary(walletAddress: string): Promise<{
     hires_by_method: Record<string, number>;
     top_asset: string | null;
   };
+  as_yield?: {
+    total_earned_stroops: string;
+    this_month_stroops: string;
+    active_vaults_with_boost: number;
+    next_epoch_at: string;
+    base_apy_bp: number;
+    boost_apy_bp: number;
+    boost_days: number;
+  };
 }> {
   const [vaultsAgg, buyerSpend, sellerEarned] = await Promise.all([
     pool.query<{ active_vaults: number; total_deposited: string; asset_code: string }>(
@@ -558,6 +567,26 @@ export async function getSummary(walletAddress: string): Promise<{
   const totalEarned = sumByAsset(sellerEarned.rows);
   const topAsset = Object.entries(totalEarned).sort(([, a], [, b]) => Number(b) - Number(a))[0]?.[0] ?? null;
 
+  let as_yield: {
+    total_earned_stroops: string;
+    this_month_stroops: string;
+    active_vaults_with_boost: number;
+    next_epoch_at: string;
+    base_apy_bp: number;
+    boost_apy_bp: number;
+    boost_days: number;
+  } | undefined;
+  if (process.env.FEATURE_M2_VAULT_YIELD === 'true') {
+    try {
+      const { getBuyerRewardSummary } = await import('./vaultRewards');
+      const r = await getBuyerRewardSummary(walletAddress);
+      as_yield = r.data;
+    } catch {
+      // yield surface is best-effort; a failure here must not break the v0.30 summary shape.
+      as_yield = undefined;
+    }
+  }
+
   return {
     as_buyer: {
       active_vaults: vaultsAgg.rows.reduce((n, r) => n + Number(r.active_vaults), 0),
@@ -571,5 +600,6 @@ export async function getSummary(walletAddress: string): Promise<{
       hires_by_method: countByMethod(sellerEarned.rows),
       top_asset: topAsset,
     },
+    as_yield,
   };
 }

@@ -30,6 +30,13 @@ interface Props {
   onEditAllowlist: () => void;
   onClose: () => void;
   onPause: () => void;
+  /** Optional yield summary for this vault — falls through when yield flag is off. */
+  reward?: {
+    monthStroops: string;
+    totalStroops: string;
+    apyBp: number;
+    boostDaysRemaining: number;
+  };
 }
 
 const STATUS_LABEL: Record<BudgetVault['status'], string> = {
@@ -54,6 +61,42 @@ function contractExplorerUrl(contract: string, network: 'testnet' | 'mainnet'): 
   return `https://stellar.expert/explorer/${network === 'mainnet' ? 'public' : 'testnet'}/contract/${contract}`;
 }
 
+/**
+ * RewardBadge — inline micro-component (PRD-N v0.31 yield-rewards).
+ * Renders only when the yield flag is on AND the vault has an APY assigned.
+ */
+function RewardBadge(props: {
+  monthStroops: string;
+  totalStroops: string;
+  apyBp: number;
+  assetCode: string;
+  boostDaysRemaining: number;
+}) {
+  const YIELD_ENABLED = process.env.NEXT_PUBLIC_FEATURE_M2_VAULT_YIELD === 'true';
+  if (!YIELD_ENABLED) return null;
+  const month = fromStroopsFmt(props.monthStroops);
+  const boostChip = props.boostDaysRemaining > 0
+    ? <span className="ml-1 rounded-sm bg-emerald-100 px-1 text-emerald-800">boost {props.boostDaysRemaining}d</span>
+    : null;
+  return (
+    <div className="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200">
+      <span>+{month} {props.assetCode}</span>
+      <span className="text-emerald-600">this month · {(props.apyBp / 100).toFixed(1)}% APY</span>
+      {boostChip}
+    </div>
+  );
+}
+
+function fromStroopsFmt(stroops: string | null | undefined): string {
+  if (!stroops || stroops === '0') return '0';
+  const s = BigInt(stroops);
+  const whole = s / 10_000_000n;
+  const frac = s % 10_000_000n;
+  if (frac === 0n) return whole.toString();
+  const fracStr = frac.toString().padStart(7, '0').replace(/0+$/, '');
+  return `${whole.toString()}.${fracStr}`;
+}
+
 function AllowlistSummary({ vault }: { vault: BudgetVault }) {
   if (vault.allowlist_mode === 'any') return <span>Any agent</span>;
   const n = Array.isArray(vault.allowlist) ? vault.allowlist.length : 0;
@@ -61,7 +104,7 @@ function AllowlistSummary({ vault }: { vault: BudgetVault }) {
   return <span>{n} {label} allowlisted</span>;
 }
 
-export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllowlist, onClose, onPause }: Props) {
+export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllowlist, onClose, onPause, reward }: Props) {
   const { address } = useStellarWallet();
   const [showHires, setShowHires] = useState(false);
   const [hires, setHires] = useState<Hire[] | null>(null);
@@ -124,6 +167,15 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
             {vault.per_hire_cap ? ` · cap ${vault.per_hire_cap}/hire` : ''}
             {' · '}<AllowlistSummary vault={vault} />
           </div>
+          {reward ? (
+            <RewardBadge
+              monthStroops={reward.monthStroops}
+              totalStroops={reward.totalStroops}
+              apyBp={reward.apyBp}
+              assetCode={vault.asset_code}
+              boostDaysRemaining={reward.boostDaysRemaining}
+            />
+          ) : null}
         </div>
       </div>
 

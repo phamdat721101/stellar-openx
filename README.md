@@ -34,8 +34,8 @@ A native marketplace where **sellers publish an AI assistant once** and **buyers
 
 | | 🌐 **Public** | 🕶️ **Private** | 🛡️ **Escrow** | 💰 **Budget** |
 |---|:---:|:---:|:---:|:---:|
-| **Rate** | 1.0× base | 1.5× base | 2.0× base | 1.0× base |
-| **Settles via** | `paywall-router` (multi-asset) | Privacy Pool + ZK proof | Trustless Work escrow | `budget-vault` (deposit-once) |
+| **Rate** | 1.0× base | 1.5× base | 2.0× base | 1.0× base **+ 4-8% APY yield** |
+| **Settles via** | `paywall-router` (multi-asset) | Privacy Pool + ZK proof | Trustless Work escrow | `budget-vault` (deposit-once) · idle balance earns weekly rewards |
 | **Counterparty on-chain?** | ✅ visible | ❌ hidden | ✅ visible | ✅ visible |
 | **Buyer-approval gate?** | ❌ instant | ❌ instant | ✅ buyer signs release | ❌ instant |
 | **Wallet signatures** | 1 | 1 + 1 ZK proof | 4 (deploy, fund, approve, release) | **0 per hire** (1 upfront deposit) |
@@ -180,6 +180,7 @@ npm run smoke:all   # cargo + marketplace + privacy-pool + ZK + escrow
 | 📐 Product decisions | [`docs/prd/PRD-S-stellar-native-mvp.md`](./docs/prd/PRD-S-stellar-native-mvp.md) |
 | 🔐 Deploy ZK tier | [`docs/runbooks/ZK_DEPLOY.md`](./docs/runbooks/ZK_DEPLOY.md) |
 | 💰 Deploy MGUSD + BudgetVault (v0.30) | [`docs/runbooks/MGUSD_BUDGET_DEPLOY.md`](./docs/runbooks/MGUSD_BUDGET_DEPLOY.md) |
+| 🌾 Enable BudgetVault yield-rewards (v0.31) | [`docs/runbooks/VAULT_YIELD_DEPLOY.md`](./docs/runbooks/VAULT_YIELD_DEPLOY.md) · [PRD-N](./docs/prd/PRD-N-vault-yield-rewards.md) |
 | 🛡️ Trustless Work integration | [Trustless Work docs](https://docs.trustlesswork.com) |
 | 🌐 Testnet snapshot | [`docs/runbooks/DEPLOY_LIVE.md`](./docs/runbooks/DEPLOY_LIVE.md) |
 | 🏗️ Redeploy Soroban | [`docs/runbooks/STELLAR_DEPLOY.md`](./docs/runbooks/STELLAR_DEPLOY.md) |
