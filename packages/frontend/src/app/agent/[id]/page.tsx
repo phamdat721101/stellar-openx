@@ -366,12 +366,12 @@ export default function AgentDetailPage() {
     setAnswer(null);
   };
 
-  if (loading) return <div className="py-20 text-center text-zinc-500">Loading agent…</div>;
+  if (loading) return <div className="py-20 text-center text-on-surface-variant/70">Loading agent…</div>;
   if (!agent) {
     return (
       <div className="py-20 text-center">
-        <p className="text-zinc-400">Agent not found.</p>
-        <Link href="/marketplace" className="mt-3 inline-block text-sm text-emerald-400 hover:underline">
+        <p className="text-on-surface-variant">Agent not found.</p>
+        <Link href="/browse" className="mt-3 inline-block text-sm text-primary-container hover:underline">
           ← Back to marketplace
         </Link>
       </div>
@@ -383,24 +383,24 @@ export default function AgentDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/marketplace" className="inline-block text-sm text-zinc-400 hover:text-white">
+      <Link href="/browse" className="inline-block text-sm text-on-surface-variant hover:text-on-surface">
         ← Back to marketplace
       </Link>
 
       {/* HEADER */}
-      <header className="space-y-3 border-b border-zinc-800 pb-5">
+      <header className="space-y-3 border-b border-outline-variant/40 pb-5">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-emerald-700/40 bg-emerald-900/30 px-2 py-0.5 font-mono text-[10px] uppercase text-emerald-300">
+          <span className="rounded-full border border-primary-container/40 bg-primary-container/15 px-2 py-0.5 font-mono text-[10px] uppercase text-primary-container">
             {onChain ? 'LIVE on Stellar' : 'DRAFT'}
           </span>
-          <span className="rounded-full border border-purple-700/40 bg-purple-900/20 px-2 py-0.5 font-mono text-[10px] uppercase text-purple-300">
+          <span className="rounded-full border border-tertiary-container/40 bg-tertiary-container/15 px-2 py-0.5 font-mono text-[10px] uppercase text-on-tertiary-container">
             Privacy ready
           </span>
-          <span className="font-mono text-[10px] text-zinc-500">/api/v1/{agent.slug}</span>
+          <span className="font-mono text-[10px] text-on-surface-variant/70">/api/v1/{agent.slug}</span>
         </div>
         <h1 className="text-3xl font-bold tracking-tight">{agent.slug}</h1>
-        <p className="max-w-3xl text-zinc-400">{agent.persona?.system_prompt}</p>
-        <p className="font-mono text-xs text-zinc-500">
+        <p className="max-w-3xl text-on-surface-variant">{agent.persona?.system_prompt}</p>
+        <p className="font-mono text-xs text-on-surface-variant/70">
           Owner {agent.owner_address.slice(0, 6)}…{agent.owner_address.slice(-4)}
         </p>
       </header>
@@ -420,27 +420,27 @@ export default function AgentDetailPage() {
           </section>
 
           {/* system instructions */}
-          <section className="rounded-xl border border-zinc-800 bg-zinc-900">
-            <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
-              <h2 className="font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+          <section className="rounded-xl border border-outline-variant/40 bg-surface-container-low">
+            <div className="flex items-center justify-between border-b border-outline-variant/40 px-5 py-3">
+              <h2 className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">
                 System instructions
               </h2>
-              <span className="font-mono text-[10px] text-zinc-500">seller-authored</span>
+              <span className="font-mono text-[10px] text-on-surface-variant/70">seller-authored</span>
             </div>
-            <pre className="overflow-x-auto whitespace-pre-wrap p-5 font-mono text-xs leading-relaxed text-zinc-300">
+            <pre className="overflow-x-auto whitespace-pre-wrap p-5 font-mono text-xs leading-relaxed text-on-surface-variant">
               {agent.persona?.system_prompt}
             </pre>
           </section>
 
           {/* hire form */}
-          <section className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+          <section className="space-y-3 rounded-xl border border-outline-variant/40 bg-surface-container-low p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-semibold">Hire this agent</h2>
               <PrivacyModeToggle mode={mode} onChange={setMode} basePriceUsdc={price} />
             </div>
             {budget.vaults.filter((v) => v.status === 'active' && Number(v.balance_cache ?? 0) > 0).length > 0 && (
-              <div className="rounded-lg border border-emerald-800/40 bg-emerald-950/20 p-3 text-xs">
-                <label className="flex items-center gap-2 text-emerald-200">
+              <div className="rounded-lg border border-primary-container/40 bg-primary-container/10 p-3 text-xs">
+                <label className="flex items-center gap-2 text-primary-container">
                   <input
                     type="checkbox"
                     checked={!!selectedVaultId}
@@ -449,16 +449,16 @@ export default function AgentDetailPage() {
                       const first = budget.vaults.find((v) => v.status === 'active' && Number(v.balance_cache ?? 0) >= Number(price));
                       setSelectedVaultId(first?.id ?? null);
                     }}
-                    className="rounded border-emerald-700 bg-emerald-900 text-emerald-500 focus:ring-emerald-500"
+                    className="rounded border-primary-container/40 bg-primary-container/20 text-primary-container focus:ring-primary-container"
                   />
                   <span className="font-medium">💰 Pay from budget vault</span>
-                  <span className="text-emerald-400">(zero wallet signatures)</span>
+                  <span className="text-primary-container">(zero wallet signatures)</span>
                 </label>
                 {selectedVaultId && (
                   <select
                     value={selectedVaultId}
                     onChange={(e) => setSelectedVaultId(e.target.value)}
-                    className="mt-2 block w-full rounded border-emerald-800 bg-zinc-950 px-2 py-1 font-mono text-xs text-zinc-100 focus:border-emerald-500 focus:outline-none"
+                    className="mt-2 block w-full rounded border-primary-container/40 bg-background px-2 py-1 font-mono text-xs text-on-surface focus:border-primary-container focus:outline-none"
                   >
                     {budget.vaults
                       .filter((v) => v.status === 'active')
@@ -477,13 +477,13 @@ export default function AgentDetailPage() {
               onChange={(e) => setQuestion(e.target.value)}
               rows={4}
               placeholder="What do you want this agent to do?"
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm focus:border-emerald-500 focus:outline-none"
+              className="w-full rounded-lg border border-outline-variant/40 bg-background p-3 text-sm focus:border-primary-container focus:outline-none"
             />
             <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={hire}
                 disabled={busy || connecting || !onChain}
-                className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-primary-container text-on-primary px-5 py-2 text-sm font-medium hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy
                   ? 'Working…'
@@ -492,18 +492,18 @@ export default function AgentDetailPage() {
                     : `Hire · ${mode === 'private' ? 'Private' : 'Public'}`}
               </button>
               {!onChain && (
-                <span className="text-xs text-amber-400">
+                <span className="text-xs text-tertiary-container">
                   Awaiting on-chain registration — the seller must publish this agent before buyers can pay USDC.
                 </span>
               )}
               {err && (
                 <div className="flex flex-col gap-2">
-                  <span className="whitespace-pre-line text-sm text-red-400">{err}</span>
+                  <span className="whitespace-pre-line text-sm text-error">{err}</span>
                   {mode === 'private' && /^zk-|private/.test(err) && (
                     <button
                       onClick={switchToPublicAndHire}
                       disabled={busy}
-                      className="self-start rounded-lg border border-emerald-600 bg-emerald-950/40 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:border-emerald-400 hover:text-emerald-200 disabled:opacity-50"
+                      className="self-start rounded-lg border border-primary-container/60 bg-primary-container/10 px-3 py-1.5 text-xs font-medium text-primary-container hover:border-primary-container hover:text-primary-container disabled:opacity-50"
                     >
                       Switch to Public · ${Number(price).toFixed(2)}
                     </button>
@@ -512,38 +512,38 @@ export default function AgentDetailPage() {
               )}
             </div>
             {answer && (
-              <article className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-                <h3 className="mb-2 text-xs font-semibold uppercase text-emerald-400">Result</h3>
-                <pre className="whitespace-pre-wrap font-mono text-sm text-zinc-100">{answer}</pre>
+              <article className="rounded-lg border border-outline-variant/40 bg-background p-4">
+                <h3 className="mb-2 text-xs font-semibold uppercase text-primary-container">Result</h3>
+                <pre className="whitespace-pre-wrap font-mono text-sm text-on-surface">{answer}</pre>
                 {mode === 'escrow' && escrowAddr && !escrowDone && (
-                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-800 pt-3">
-                    <span className="text-xs text-amber-300">
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-outline-variant/40 pt-3">
+                    <span className="text-xs text-tertiary-container">
                       Funds locked in escrow · <code className="font-mono">{escrowAddr.slice(0, 8)}…{escrowAddr.slice(-4)}</code>
                     </span>
                     <button
                       onClick={escrowApprove}
                       disabled={busy}
-                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
+                      className="rounded-lg bg-primary-container text-on-primary px-3 py-1.5 text-xs font-medium hover:opacity-90 disabled:opacity-50"
                     >
                       Approve &amp; release
                     </button>
                     <button
                       onClick={escrowDispute}
                       disabled={busy}
-                      className="rounded-lg border border-red-600/50 px-3 py-1.5 text-xs font-medium text-red-300 hover:border-red-400 hover:text-red-200 disabled:opacity-50"
+                      className="rounded-lg border border-error/50 px-3 py-1.5 text-xs font-medium text-error hover:border-error hover:text-error disabled:opacity-50"
                     >
                       Dispute
                     </button>
                   </div>
                 )}
                 {escrowDone === 'released' && (
-                  <div className="mt-4 flex items-center gap-2 border-t border-zinc-800 pt-3 text-xs text-emerald-300">
+                  <div className="mt-4 flex items-center gap-2 border-t border-outline-variant/40 pt-3 text-xs text-primary-container">
                     ✅ Payment released to seller.
-                    <button onClick={escrowReset} className="underline hover:text-emerald-200">Hire again</button>
+                    <button onClick={escrowReset} className="underline hover:text-primary-container">Hire again</button>
                   </div>
                 )}
                 {escrowDone === 'disputed' && (
-                  <div className="mt-4 border-t border-zinc-800 pt-3 text-xs text-amber-300">
+                  <div className="mt-4 border-t border-outline-variant/40 pt-3 text-xs text-tertiary-container">
                     Dispute raised. Platform will resolve; funds remain in escrow until then.
                   </div>
                 )}
@@ -555,36 +555,36 @@ export default function AgentDetailPage() {
         {/* SIDEBAR 4/12 */}
         <aside className="space-y-4 lg:col-span-4">
           <div className="sticky top-24 space-y-4">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+            <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-4">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                <h3 className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">
                   Recent transactions
                 </h3>
-                <span className="flex items-center gap-1 font-mono text-[10px] text-emerald-400">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                <span className="flex items-center gap-1 font-mono text-[10px] text-primary-container">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary-container text-on-primary" />
                   live
                 </span>
               </div>
               {recent.length === 0 ? (
-                <p className="py-3 text-center font-mono text-[11px] text-zinc-500">
+                <p className="py-3 text-center font-mono text-[11px] text-on-surface-variant/70">
                   No paid calls yet — be the first.
                 </p>
               ) : (
-                <ul className="divide-y divide-zinc-800/80">
+                <ul className="divide-y divide-outline-variant/40">
                   {recent.map((r) => {
                     const explorer = stellarExplorerTxUrl(r.tx_hash);
                     const body = (
                       <>
-                        <span className="truncate text-emerald-300">{r.buyer_anon}</span>
-                        <span className="text-zinc-100">${fmtUsdcAmount(r.amount_usdc)}</span>
-                        <span className="shrink-0 rounded-full border border-zinc-700 px-1.5 py-0.5 text-[9px] uppercase text-zinc-400">
+                        <span className="truncate text-primary-container">{r.buyer_anon}</span>
+                        <span className="text-on-surface">${fmtUsdcAmount(r.amount_usdc)}</span>
+                        <span className="shrink-0 rounded-full border border-outline-variant/60 px-1.5 py-0.5 text-[9px] uppercase text-on-surface-variant">
                           {r.method.replace('stellar_', '').replace('privacy_pool', 'private')}
                         </span>
-                        <span className="shrink-0 text-zinc-500">{relTime(r.created_at)}</span>
+                        <span className="shrink-0 text-on-surface-variant/70">{relTime(r.created_at)}</span>
                         {explorer && (
                           <span
                             aria-hidden
-                            className="shrink-0 text-zinc-500 group-hover:text-emerald-300"
+                            className="shrink-0 text-on-surface-variant/70 group-hover:text-primary-container"
                             title="View on Stellar Expert"
                           >
                             ↗
@@ -599,7 +599,7 @@ export default function AgentDetailPage() {
                             href={explorer}
                             target="_blank"
                             rel="noreferrer noopener"
-                            className="flex items-center justify-between gap-2 py-1.5 font-mono text-[11px] hover:bg-zinc-800/40 -mx-2 px-2 rounded"
+                            className="flex items-center justify-between gap-2 py-1.5 font-mono text-[11px] hover:bg-surface-container/40 -mx-2 px-2 rounded"
                           >
                             {body}
                           </a>
@@ -615,15 +615,15 @@ export default function AgentDetailPage() {
               )}
             </div>
 
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-sm">
-              <h3 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+            <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-4 text-sm">
+              <h3 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">
                 For integrators
               </h3>
-              <p className="text-zinc-400">
+              <p className="text-on-surface-variant">
                 Every published agent is an x402 endpoint at{' '}
-                <code className="font-mono text-emerald-300">/api/v1/{agent.slug}</code>.
+                <code className="font-mono text-primary-container">/api/v1/{agent.slug}</code>.
               </p>
-              <Link href="/docs" className="mt-2 inline-block text-xs text-emerald-400 hover:underline">
+              <Link href="/docs" className="mt-2 inline-block text-xs text-primary-container hover:underline">
                 Read the integration docs →
               </Link>
             </div>
@@ -636,10 +636,10 @@ export default function AgentDetailPage() {
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-      <div className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">{label}</div>
+    <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-4">
+      <div className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant/70">{label}</div>
       <div className="mt-1 text-xl font-semibold">{value}</div>
-      {sub && <div className="mt-0.5 text-[11px] text-zinc-500">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[11px] text-on-surface-variant/70">{sub}</div>}
     </div>
   );
 }

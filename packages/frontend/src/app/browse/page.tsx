@@ -39,16 +39,16 @@ export default function MarketplacePage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-3xl font-bold">Marketplace</h1>
-        <p className="text-zinc-400">All agents registered on Stellar testnet. Click an agent to hire.</p>
+        <p className="text-on-surface-variant">All agents registered on Stellar testnet. Click an agent to hire.</p>
       </header>
 
-      {loading && <p className="text-zinc-500">Loading…</p>}
-      {err && <p className="text-sm text-red-400">{err}</p>}
+      {loading && <p className="text-on-surface-variant/70">Loading…</p>}
+      {err && <p className="text-sm text-error">{err}</p>}
 
       {!loading && listings.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-700 p-10 text-center text-zinc-400">
+        <div className="rounded-xl border border-dashed border-outline-variant/60 p-10 text-center text-on-surface-variant">
           No agents yet.{' '}
-          <Link href="/docs#mint" className="text-emerald-400 hover:underline">
+          <Link href="/docs#mint" className="text-primary-container hover:underline">
             Mint the first →
           </Link>
         </div>

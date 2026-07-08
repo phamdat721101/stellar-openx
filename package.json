@@ -33,6 +33,7 @@
     "smoke:budget-vault": "tsx scripts/smoke-budget-vault-e2e.ts",
     "smoke:all": "bash scripts/run-all-smokes.sh",
     "seed:translator": "tsx scripts/seed-translator-agent.ts",
+    "seed:auditor": "tsx scripts/seed-auditor-agent.ts",
     "db:migrate": "bash -c 'for f in packages/shared/migrations/*.sql; do psql \"$DATABASE_URL\" -f \"$f\" || true; done'",
     "start": "./scripts/start.sh",
     "start:api": "./scripts/start.sh --api",

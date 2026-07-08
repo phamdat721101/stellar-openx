@@ -307,6 +307,7 @@ RUN_MGUSD=1 RUN_YIELD=1 npm run smoke:all   # + MGUSD + BudgetVault + yield-rewa
 | 🔐 Deploy ZK tier | [`docs/runbooks/ZK_DEPLOY.md`](./docs/runbooks/ZK_DEPLOY.md) |
 | 💰 Deploy MGUSD + BudgetVault (v0.30) | [`docs/runbooks/MGUSD_BUDGET_DEPLOY.md`](./docs/runbooks/MGUSD_BUDGET_DEPLOY.md) |
 | 🌾 Enable BudgetVault yield-rewards (v0.31) | [`docs/runbooks/VAULT_YIELD_DEPLOY.md`](./docs/runbooks/VAULT_YIELD_DEPLOY.md) · [PRD-N](./docs/prd/PRD-N-vault-yield-rewards.md) |
+| 🎨 UI v2 refresh (Uniswap + Google inspired, v0.32) | [`docs/runbooks/UI_V2_DEPLOY.md`](./docs/runbooks/UI_V2_DEPLOY.md) · [PRD-U](./docs/prd/PRD-U-ui-refresh-uniswap-google.md) |
 | 🛡️ Trustless Work integration | [Trustless Work docs](https://docs.trustlesswork.com) |
 | 💵 MoneyGram Ramps SEP-24 | [MoneyGram Developer Portal](https://developer.moneygram.com/) |
 | 🌐 Testnet snapshot | [`docs/runbooks/DEPLOY_LIVE.md`](./docs/runbooks/DEPLOY_LIVE.md) |

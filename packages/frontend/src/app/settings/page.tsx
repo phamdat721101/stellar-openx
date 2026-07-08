@@ -43,7 +43,7 @@ export default function SettingsPage() {
         <button
           onClick={connect}
           disabled={connecting}
-          className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
+          className="rounded-lg bg-primary-container text-on-primary px-5 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50"
         >
           {connecting ? 'Connecting…' : 'Connect Stellar wallet'}
         </button>
@@ -55,21 +55,21 @@ export default function SettingsPage() {
     <div className="space-y-8">
       <header>
         <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-zinc-400">Account, balance, and Stellar receipts.</p>
+        <p className="text-on-surface-variant">Account, balance, and Stellar receipts.</p>
       </header>
 
       {/* Account */}
-      <section className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+      <section className="space-y-3 rounded-xl border border-outline-variant/40 bg-surface-container-low p-6">
         <h2 className="text-lg font-semibold">Account</h2>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="font-mono text-xs text-zinc-500">Stellar address</div>
+            <div className="font-mono text-xs text-on-surface-variant/70">Stellar address</div>
             <div className="truncate font-mono text-sm">{address}</div>
-            <div className="mt-1 font-mono text-[10px] text-zinc-500">network: stellar:{network}</div>
+            <div className="mt-1 font-mono text-[10px] text-on-surface-variant/70">network: stellar:{network}</div>
           </div>
           <button
             onClick={disconnect}
-            className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-red-300 hover:border-red-500"
+            className="rounded-lg border border-outline-variant/60 px-4 py-2 text-sm text-error hover:border-error"
           >
             Sign out
           </button>
@@ -77,21 +77,21 @@ export default function SettingsPage() {
       </section>
 
       {/* Balance */}
-      <section className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+      <section className="space-y-3 rounded-xl border border-outline-variant/40 bg-surface-container-low p-6">
         <h2 className="text-lg font-semibold">USDC balance</h2>
         <div className="flex items-baseline gap-3">
           <span className="text-3xl font-bold">${usdcBalance}</span>
-          <span className="text-sm text-zinc-500">USDC on Stellar {network}</span>
+          <span className="text-sm text-on-surface-variant/70">USDC on Stellar {network}</span>
         </div>
         <div className="flex flex-wrap gap-2 pt-2">
           <button
             onClick={() => setTopUpOpen(true)}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm hover:bg-emerald-500"
+            className="rounded-lg bg-primary-container text-on-primary px-4 py-2 text-sm hover:opacity-90"
           >
             Top up
           </button>
           {credits.enabled && (
-            <span className="rounded-lg border border-zinc-700 px-3 py-2 text-sm">
+            <span className="rounded-lg border border-outline-variant/60 px-3 py-2 text-sm">
               Credit balance: {credits.display}
             </span>
           )}
@@ -101,9 +101,9 @@ export default function SettingsPage() {
       {/* Contracts */}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Soroban contracts ({platform?.network ?? network})</h2>
-        <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+        <div className="overflow-hidden rounded-xl border border-outline-variant/40 bg-surface-container-low">
           <table className="w-full text-sm">
-            <thead className="bg-zinc-800 text-left font-mono text-[10px] uppercase text-zinc-400">
+            <thead className="bg-surface-container text-left font-mono text-[10px] uppercase text-on-surface-variant">
               <tr>
                 <th className="px-4 py-2">Name</th>
                 <th className="px-4 py-2">Contract id</th>
@@ -113,9 +113,9 @@ export default function SettingsPage() {
             <tbody>
               {platform &&
                 Object.entries(platform.contracts).map(([name, id]) => (
-                  <tr key={name} className="border-t border-zinc-800">
+                  <tr key={name} className="border-t border-outline-variant/40">
                     <td className="px-4 py-3 font-medium capitalize">{name.replace(/([A-Z])/g, ' $1').toLowerCase()}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-zinc-400">
+                    <td className="px-4 py-3 font-mono text-xs text-on-surface-variant">
                       {id ? `${id.slice(0, 8)}…${id.slice(-6)}` : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -124,7 +124,7 @@ export default function SettingsPage() {
                           href={EXPLORER(platform.network, id)}
                           target="_blank"
                           rel="noopener"
-                          className="text-xs text-emerald-400 hover:underline"
+                          className="text-xs text-primary-container hover:underline"
                         >
                           Stellar Expert ↗
                         </Link>

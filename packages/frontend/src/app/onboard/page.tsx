@@ -25,7 +25,7 @@ export default function OnboardPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <header className="space-y-2">
-        <p className="font-mono text-xs uppercase tracking-wider text-emerald-400">⭐ Welcome to OpenX-S</p>
+        <p className="font-mono text-xs uppercase tracking-wider text-primary-container">⭐ Welcome to OpenX-S</p>
         <h1 className="text-3xl font-bold leading-tight tracking-tight">
           Hire your first AI assistant in three steps.
         </h1>
@@ -36,27 +36,27 @@ export default function OnboardPage() {
           <button
             onClick={connect}
             disabled={connecting}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
+            className="rounded-lg bg-primary-container text-on-primary px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
           >
             {connecting ? 'Opening wallet…' : 'Connect Freighter / LOBSTR / Albedo'}
           </button>
         ) : (
-          <p className="font-mono text-xs text-zinc-400">{address}</p>
+          <p className="font-mono text-xs text-on-surface-variant">{address}</p>
         )}
       </Step>
 
       <Step n={2} done={step > 2} title="Top up USDC">
         {!address ? (
-          <p className="text-sm text-zinc-500">Connect a wallet first.</p>
+          <p className="text-sm text-on-surface-variant/70">Connect a wallet first.</p>
         ) : (
           <div className="space-y-2">
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-on-surface-variant">
               Current balance: <span className="font-mono">${usdcBalance}</span>
               {credits.enabled && ` · credits ${credits.display}`}
             </p>
             <button
               onClick={() => setTopUpOpen(true)}
-              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm hover:border-emerald-500"
+              className="rounded-lg border border-outline-variant/60 px-4 py-2 text-sm hover:border-primary-container"
             >
               Top up via Coinflow Stellar
             </button>
@@ -66,16 +66,16 @@ export default function OnboardPage() {
 
       <Step n={3} done={false} title="Hire your first assistant">
         <Link
-          href="/marketplace"
-          className="inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500"
+          href="/browse"
+          className="inline-block rounded-lg bg-primary-container text-on-primary px-4 py-2 text-sm font-medium hover:opacity-90"
         >
           Open marketplace →
         </Link>
       </Step>
 
-      <p className="pt-4 text-center text-sm text-zinc-500">
+      <p className="pt-4 text-center text-sm text-on-surface-variant/70">
         Building an assistant?{' '}
-        <Link href="/docs#mint" className="text-emerald-400 hover:underline">
+        <Link href="/docs#mint" className="text-primary-container hover:underline">
           Mint in one prompt →
         </Link>
       </p>
@@ -98,12 +98,12 @@ function Step({
 }) {
   return (
     <section
-      className={`rounded-xl border p-5 ${done ? 'border-emerald-800/60 bg-emerald-950/20' : 'border-zinc-800 bg-zinc-900'}`}
+      className={`rounded-xl border p-5 ${done ? 'border-primary-container/40 bg-primary-container/10' : 'border-outline-variant/40 bg-surface-container-low'}`}
     >
       <div className="mb-2 flex items-center gap-3">
         <span
           className={`flex h-7 w-7 items-center justify-center rounded-full font-mono text-xs ${
-            done ? 'bg-emerald-600 text-white' : 'border border-zinc-700 text-zinc-400'
+            done ? 'bg-primary-container text-on-primary' : 'border border-outline-variant/60 text-on-surface-variant'
           }`}
         >
           {done ? '✓' : n}

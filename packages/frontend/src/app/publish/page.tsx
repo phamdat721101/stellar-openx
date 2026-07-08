@@ -107,6 +107,11 @@ export default function StudioPage() {
   const [escrows, setEscrows] = useState<EscrowRow[]>([]);
   const [purchases, setPurchases] = useState<EscrowRow[]>([]);
   const [busyContract, setBusyContract] = useState<string | null>(null);
+  // PRD-U follow-up (2026-07-08) — client-side pagination so long lists
+  // don't force scroll. 5 rows/page matches Google-search results rhythm
+  // and keeps the section under one viewport height.
+  const pagedPurchases = usePaged(purchases, 5);
+  const pagedEscrows = usePaged(escrows, 5);
   const runEscrowAction = useEscrowActions(address, signTransaction);
 
   const refetch = useCallback(async () => {
@@ -281,11 +286,11 @@ export default function StudioPage() {
     return (
       <div className="mx-auto max-w-md space-y-4 py-20 text-center">
         <h1 className="text-2xl font-bold">Sign in to manage your assistants</h1>
-        <p className="text-zinc-400">Connect a Stellar wallet to view your published agents and revenue.</p>
+        <p className="text-on-surface-variant">Connect a Stellar wallet to view your published agents and revenue.</p>
         <button
           onClick={connect}
           disabled={connecting}
-          className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
+          className="rounded-lg bg-primary-container text-on-primary px-5 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50"
         >
           {connecting ? 'Connecting…' : 'Connect Stellar wallet'}
         </button>
@@ -298,44 +303,44 @@ export default function StudioPage() {
       <header className="flex items-end justify-between">
         <div>
           <h1 className="text-3xl font-bold">Studio</h1>
-          <p className="text-zinc-400">Your published assistants on Stellar testnet.</p>
+          <p className="text-on-surface-variant">Your published assistants on Stellar testnet.</p>
         </div>
         <button
           onClick={openMintModal}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500"
+          className="rounded-lg bg-primary-container text-on-primary px-4 py-2 text-sm font-medium hover:opacity-90"
         >
           + Mint agent
         </button>
       </header>
 
-      {loading && <p className="text-zinc-500">Loading…</p>}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {loading && <p className="text-on-surface-variant/70">Loading…</p>}
+      {error && <p className="text-sm text-error">{error}</p>}
 
       <BudgetAndEarningsSection />
 
       {purchases.length > 0 && (
-        <section className="rounded-xl border border-emerald-800/40 bg-emerald-950/10 p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-200">
+        <section className="rounded-xl border border-primary-container/40 bg-primary-container/10 p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary-container">
             Your purchases
-            <span className="rounded-full border border-emerald-700/40 bg-emerald-900/30 px-2 py-0.5 font-mono text-[10px] uppercase">
+            <span className="rounded-full border border-primary-container/40 bg-primary-container/15 px-2 py-0.5 font-mono text-[10px] uppercase">
               {purchases.length}
             </span>
-            <span className="ml-2 text-[10px] font-normal text-zinc-500">
+            <span className="ml-2 text-[10px] font-normal text-on-surface-variant/70">
               Escrow-tier hires you paid for — approve to release USDC to the seller, or dispute.
             </span>
           </h2>
           <ul className="space-y-2">
-            {purchases.map((row) => {
+            {pagedPurchases.pageItems.map((row) => {
               const isBusy = busyContract === row.contract_address;
               const canApprove = row.status === 'answered';
               const canDispute = ['funded', 'answered', 'approved'].includes(row.status);
               return (
-                <li key={row.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                <li key={row.id} className="rounded-lg border border-outline-variant/40 bg-background p-3">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <Link href={`/agent/${row.agent_id}`} className="font-mono text-emerald-300 hover:underline">
+                    <Link href={`/agent/${row.agent_id}`} className="font-mono text-primary-container hover:underline">
                       {row.slug}
                     </Link>
-                    <span className="font-mono text-zinc-500">${Number(row.amount_usdc).toFixed(2)}</span>
+                    <span className="font-mono text-on-surface-variant/70">${Number(row.amount_usdc).toFixed(2)}</span>
                     <StatusPill status={row.status} />
                     <span className="ml-auto flex items-center gap-1">
                       <TxLink label="deploy"  hash={row.deploy_tx_hash} />
@@ -347,16 +352,16 @@ export default function StudioPage() {
                     </span>
                   </div>
                   {row.question && (
-                    <p className="mt-2 line-clamp-2 text-xs text-zinc-400">
-                      <span className="font-mono uppercase text-zinc-600">Q:</span> {row.question}
+                    <p className="mt-2 line-clamp-2 text-xs text-on-surface-variant">
+                      <span className="font-mono uppercase text-on-surface-variant/50">Q:</span> {row.question}
                     </p>
                   )}
                   {row.answer && (
-                    <details className="mt-1 text-xs text-zinc-300">
-                      <summary className="cursor-pointer text-emerald-400 hover:underline">
+                    <details className="mt-1 text-xs text-on-surface-variant">
+                      <summary className="cursor-pointer text-primary-container hover:underline">
                         View answer
                       </summary>
-                      <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap rounded border border-zinc-800 bg-zinc-900/60 p-2 font-mono">
+                      <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap rounded border border-outline-variant/40 bg-surface-container-low p-2 font-mono">
                         {row.answer}
                       </pre>
                     </details>
@@ -367,7 +372,7 @@ export default function StudioPage() {
                         <button
                           onClick={() => purchaseApprove(row)}
                           disabled={isBusy}
-                          className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium hover:bg-emerald-500 disabled:opacity-50"
+                          className="rounded-lg bg-primary-container text-on-primary px-3 py-1 text-xs font-medium hover:opacity-90 disabled:opacity-50"
                         >
                           {isBusy ? 'Signing…' : 'Approve & release'}
                         </button>
@@ -376,16 +381,16 @@ export default function StudioPage() {
                         <button
                           onClick={() => purchaseDispute(row)}
                           disabled={isBusy}
-                          className="rounded-lg border border-red-600/50 px-3 py-1 text-xs font-medium text-red-300 hover:border-red-400 hover:text-red-200 disabled:opacity-50"
+                          className="rounded-lg border border-error/50 px-3 py-1 text-xs font-medium text-error hover:border-error hover:text-error disabled:opacity-50"
                         >
                           Dispute
                         </button>
                       )}
                       {row.status === 'released' && (
-                        <span className="text-xs text-emerald-300">✅ Released to seller</span>
+                        <span className="text-xs text-primary-container">✅ Released to seller</span>
                       )}
                       {row.status === 'resolved' && (
-                        <span className="text-xs text-amber-300">⚖ Resolved by platform</span>
+                        <span className="text-xs text-tertiary-container">⚖ Resolved by platform</span>
                       )}
                     </div>
                   )}
@@ -393,20 +398,31 @@ export default function StudioPage() {
               );
             })}
           </ul>
+          <Pager
+            page={pagedPurchases.page}
+            pageCount={pagedPurchases.pageCount}
+            start={pagedPurchases.start}
+            end={pagedPurchases.end}
+            total={pagedPurchases.total}
+            canPrev={pagedPurchases.canPrev}
+            canNext={pagedPurchases.canNext}
+            onPrev={pagedPurchases.prev}
+            onNext={pagedPurchases.next}
+          />
         </section>
       )}
 
       {escrows.length > 0 && (
-        <section className="rounded-xl border border-amber-800/40 bg-amber-950/10 p-4">
-          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-200">
+        <section className="rounded-xl border border-tertiary-container/40 bg-tertiary-container/10 p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-tertiary-container">
             Escrow queue
-            <span className="rounded-full border border-amber-700/40 bg-amber-900/30 px-2 py-0.5 font-mono text-[10px] uppercase">
+            <span className="rounded-full border border-tertiary-container/40 bg-tertiary-container/15 px-2 py-0.5 font-mono text-[10px] uppercase">
               {escrows.length}
             </span>
-            <span className="ml-2 text-[10px] font-normal text-zinc-500">Sales awaiting buyer approval.</span>
+            <span className="ml-2 text-[10px] font-normal text-on-surface-variant/70">Sales awaiting buyer approval.</span>
           </h2>
-          <ul className="divide-y divide-amber-900/20">
-            {escrows.map((row) => {
+          <ul className="divide-y divide-tertiary-container/20">
+            {pagedEscrows.pageItems.map((row) => {
               const timeoutMs = row.timeout_at ? new Date(row.timeout_at).getTime() : 0;
               const remainMs = Math.max(0, timeoutMs - Date.now());
               const overdue = timeoutMs > 0 && remainMs === 0 && row.status === 'answered';
@@ -416,21 +432,21 @@ export default function StudioPage() {
                   : `${Math.floor(remainMs / 3_600_000)}h ${Math.floor((remainMs % 3_600_000) / 60_000)}m left`;
               return (
                 <li key={row.id} className="flex flex-wrap items-center gap-3 py-2 text-xs">
-                  <Link href={`/agent/${row.agent_id}`} className="font-mono text-emerald-300 hover:underline">
+                  <Link href={`/agent/${row.agent_id}`} className="font-mono text-primary-container hover:underline">
                     {row.slug}
                   </Link>
-                  <span className="font-mono text-zinc-500">${Number(row.amount_usdc).toFixed(2)}</span>
-                  <span className="font-mono text-zinc-500 truncate">buyer {row.buyer_address.slice(0, 6)}…{row.buyer_address.slice(-4)}</span>
+                  <span className="font-mono text-on-surface-variant/70">${Number(row.amount_usdc).toFixed(2)}</span>
+                  <span className="font-mono text-on-surface-variant/70 truncate">buyer {row.buyer_address.slice(0, 6)}…{row.buyer_address.slice(-4)}</span>
                   <StatusPill status={row.status} />
                   <span className="flex items-center gap-1">
                     <TxLink label="deploy"  hash={row.deploy_tx_hash} />
                     <TxLink label="fund"    hash={row.fund_tx_hash} />
                     <TxLink label="dispute" hash={row.dispute_tx_hash} />
                   </span>
-                  <span className="ml-auto font-mono text-zinc-400">{countdown}</span>
+                  <span className="ml-auto font-mono text-on-surface-variant">{countdown}</span>
                   <button
                     onClick={() => syncEscrowFromChain(row)}
-                    className="rounded border border-zinc-700 px-2 py-1 text-[11px] text-zinc-300 hover:border-emerald-500 hover:text-emerald-200"
+                    className="rounded border border-outline-variant/60 px-2 py-1 text-[11px] text-on-surface-variant hover:border-primary-container hover:text-primary-container"
                     title="Refresh from on-chain state — if the buyer already released, this will unlock the row."
                   >
                     Sync
@@ -438,7 +454,7 @@ export default function StudioPage() {
                   {overdue && (
                     <button
                       onClick={() => claimOverdue(row)}
-                      className="rounded border border-amber-500/60 bg-amber-950/40 px-2 py-1 text-[11px] font-medium text-amber-100 hover:border-amber-400"
+                      className="rounded border border-tertiary-container/60 bg-tertiary-container/10 px-2 py-1 text-[11px] font-medium text-tertiary-container hover:border-tertiary-container"
                     >
                       Claim overdue
                     </button>
@@ -447,13 +463,24 @@ export default function StudioPage() {
               );
             })}
           </ul>
+          <Pager
+            page={pagedEscrows.page}
+            pageCount={pagedEscrows.pageCount}
+            start={pagedEscrows.start}
+            end={pagedEscrows.end}
+            total={pagedEscrows.total}
+            canPrev={pagedEscrows.canPrev}
+            canNext={pagedEscrows.canNext}
+            onPrev={pagedEscrows.prev}
+            onNext={pagedEscrows.next}
+          />
         </section>
       )}
 
       {!loading && agents.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-700 p-10 text-center text-zinc-400">
+        <div className="rounded-xl border border-dashed border-outline-variant/60 p-10 text-center text-on-surface-variant">
           You haven&apos;t published an agent yet.{' '}
-          <button onClick={openMintModal} className="text-emerald-400 hover:underline">
+          <button onClick={openMintModal} className="text-primary-container hover:underline">
             Mint your first →
           </button>
         </div>
@@ -465,59 +492,59 @@ export default function StudioPage() {
             return (
               <li
                 key={a.id}
-                className={`rounded-xl border p-5 ${pending ? 'border-amber-700/50 bg-amber-950/10' : 'border-zinc-800 bg-zinc-900'}`}
+                className={`rounded-xl border p-5 ${pending ? 'border-tertiary-container/50 bg-tertiary-container/10' : 'border-outline-variant/40 bg-surface-container-low'}`}
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <Link
                     href={`/agent/${a.id}`}
-                    className="font-semibold text-emerald-300 hover:underline"
+                    className="font-semibold text-primary-container hover:underline"
                   >
                     {a.slug}
                   </Link>
-                  <span className="font-mono text-xs text-zinc-500">${a.pricing?.x402 ?? '0'} / call</span>
+                  <span className="font-mono text-xs text-on-surface-variant/70">${a.pricing?.x402 ?? '0'} / call</span>
                 </div>
-                <p className="line-clamp-2 text-sm text-zinc-400">{a.persona.system_prompt}</p>
+                <p className="line-clamp-2 text-sm text-on-surface-variant">{a.persona.system_prompt}</p>
                 {pending && (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-amber-300">
+                    <span className="text-xs text-tertiary-container">
                       ⚠ Not yet on-chain — buyers can&apos;t pay until you sign the mint tx.
                     </span>
                     <button
                       onClick={() => openRepairModal(a)}
-                      className="rounded border border-amber-500/60 bg-amber-950/40 px-2 py-1 text-xs font-medium text-amber-200 hover:border-amber-400 hover:text-amber-100"
+                      className="rounded border border-tertiary-container/60 bg-tertiary-container/10 px-2 py-1 text-xs font-medium text-tertiary-container hover:border-tertiary-container hover:text-tertiary-container"
                     >
                       Publish on-chain
                     </button>
                   </div>
                 )}
-                <dl className="mt-4 flex items-center gap-6 text-xs text-zinc-500">
+                <dl className="mt-4 flex items-center gap-6 text-xs text-on-surface-variant/70">
                   <div>
                     <dt>Calls</dt>
-                    <dd className="text-base font-semibold text-white">{s?.calls ?? 0}</dd>
+                    <dd className="text-base font-semibold text-on-primary">{s?.calls ?? 0}</dd>
                   </div>
                   <div>
                     <dt>Revenue</dt>
-                    <dd className="text-base font-semibold text-white">${s?.revenue_usdc ?? '0.0000'}</dd>
+                    <dd className="text-base font-semibold text-on-primary">${s?.revenue_usdc ?? '0.0000'}</dd>
                   </div>
                   <div className="ml-auto flex items-center gap-2">
                     <button
                       onClick={() => openWithdrawModal(a)}
                       disabled={!a.soroban_agent_id}
-                      className="rounded border border-emerald-700/50 px-2 py-1 text-xs text-emerald-300 hover:border-emerald-400 hover:text-emerald-200 disabled:opacity-30"
+                      className="rounded border border-primary-container/40 px-2 py-1 text-xs text-primary-container hover:border-primary-container hover:text-primary-container disabled:opacity-30"
                       title="Withdraw accrued USDC to your wallet (paid-call-ledger.agent_payout)"
                     >
                       Withdraw
                     </button>
                     <button
                       onClick={() => archive(a)}
-                      className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:border-red-500 hover:text-red-300"
+                      className="rounded border border-outline-variant/60 px-2 py-1 text-xs text-on-surface-variant hover:border-error hover:text-error"
                     >
                       Archive
                     </button>
                   </div>
                 </dl>
                 {a.soroban_agent_id && (
-                  <div className="mt-2 truncate font-mono text-[10px] text-zinc-600">
+                  <div className="mt-2 truncate font-mono text-[10px] text-on-surface-variant/50">
                     soroban: {a.soroban_agent_id}
                   </div>
                 )}
@@ -637,7 +664,7 @@ function MintModal({ draft, setDraft, onClose, address, signTransaction, onPubli
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg space-y-4 rounded-xl border border-zinc-800 bg-zinc-950 p-6"
+        className="w-full max-w-lg space-y-4 rounded-xl border border-outline-variant/40 bg-background p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between">
@@ -645,28 +672,28 @@ function MintModal({ draft, setDraft, onClose, address, signTransaction, onPubli
             <h2 className="text-lg font-semibold">
               {isRepair ? 'Publish on-chain' : 'Mint a new agent'}
             </h2>
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-on-surface-variant/70">
               Your wallet will sign one Soroban `register_agent` tx (≈ 0.01 XLM fee).
             </p>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white" aria-label="Close">✕</button>
+          <button onClick={onClose} className="text-on-surface-variant/70 hover:text-on-surface" aria-label="Close">✕</button>
         </header>
 
         <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-wider text-zinc-500">Slug</span>
+          <span className="mb-1 block text-xs uppercase tracking-wider text-on-surface-variant/70">Slug</span>
           <input
             type="text"
             value={draft.slug}
             onChange={(e) => setDraft({ ...draft, slug: e.target.value.toLowerCase() })}
             disabled={isRepair || busy}
             placeholder="my-agent"
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 font-mono text-sm focus:border-emerald-500 focus:outline-none disabled:opacity-60"
+            className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2 font-mono text-sm focus:border-primary-container focus:outline-none disabled:opacity-60"
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-wider text-zinc-500">
-            Display name <span className="text-zinc-600">(optional)</span>
+          <span className="mb-1 block text-xs uppercase tracking-wider text-on-surface-variant/70">
+            Display name <span className="text-on-surface-variant/50">(optional)</span>
           </span>
           <input
             type="text"
@@ -674,24 +701,24 @@ function MintModal({ draft, setDraft, onClose, address, signTransaction, onPubli
             onChange={(e) => setDraft({ ...draft, display_name: e.target.value })}
             disabled={busy}
             placeholder="My Agent"
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+            className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-sm focus:border-primary-container focus:outline-none"
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-wider text-zinc-500">System prompt</span>
+          <span className="mb-1 block text-xs uppercase tracking-wider text-on-surface-variant/70">System prompt</span>
           <textarea
             value={draft.system_prompt}
             onChange={(e) => setDraft({ ...draft, system_prompt: e.target.value })}
             rows={5}
             disabled={busy}
             placeholder="You are a senior … with 10 years of experience. When asked, you …"
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+            className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-sm focus:border-primary-container focus:outline-none"
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-wider text-zinc-500">Price / call (USDC)</span>
+          <span className="mb-1 block text-xs uppercase tracking-wider text-on-surface-variant/70">Price / call (USDC)</span>
           <input
             type="number"
             step="0.01"
@@ -699,25 +726,25 @@ function MintModal({ draft, setDraft, onClose, address, signTransaction, onPubli
             value={draft.price_usdc}
             onChange={(e) => setDraft({ ...draft, price_usdc: e.target.value })}
             disabled={busy}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 font-mono text-sm focus:border-emerald-500 focus:outline-none"
+            className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2 font-mono text-sm focus:border-primary-container focus:outline-none"
           />
         </label>
 
-        {status && <p className="text-sm text-emerald-300">{status}</p>}
-        {err && <p className="text-sm text-red-400">{err}</p>}
+        {status && <p className="text-sm text-primary-container">{status}</p>}
+        {err && <p className="text-sm text-error">{err}</p>}
 
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
             disabled={busy}
-            className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+            className="rounded-lg border border-outline-variant/60 px-4 py-2 text-sm text-on-surface-variant hover:border-outline-variant disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={publish}
             disabled={busy}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
+            className="rounded-lg bg-primary-container text-on-primary px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
           >
             {busy ? 'Working…' : isRepair ? 'Sign & publish on-chain' : 'Sign & mint'}
           </button>
@@ -834,25 +861,25 @@ function WithdrawModal({ state, setState, onClose, address, signTransaction, onW
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-md space-y-4 rounded-xl border border-zinc-800 bg-zinc-950 p-6"
+        className="w-full max-w-md space-y-4 rounded-xl border border-outline-variant/40 bg-background p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-semibold">Withdraw earnings</h2>
-            <p className="mt-1 text-xs text-zinc-500">
-              <code className="font-mono text-emerald-300">{agent.slug}</code> · pays USDC to your connected wallet.
+            <p className="mt-1 text-xs text-on-surface-variant/70">
+              <code className="font-mono text-primary-container">{agent.slug}</code> · pays USDC to your connected wallet.
             </p>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white" aria-label="Close">✕</button>
+          <button onClick={onClose} className="text-on-surface-variant/70 hover:text-on-surface" aria-label="Close">✕</button>
         </header>
 
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
-          <div className="text-xs uppercase tracking-wider text-zinc-500">Withdrawable now (paid-call-ledger)</div>
-          <div className="mt-1 font-mono text-2xl font-semibold text-emerald-300">
+        <div className="rounded-lg border border-outline-variant/40 bg-surface-container-low p-3">
+          <div className="text-xs uppercase tracking-wider text-on-surface-variant/70">Withdrawable now (paid-call-ledger)</div>
+          <div className="mt-1 font-mono text-2xl font-semibold text-primary-container">
             {state.loading ? '…' : `$${Number(state.balance_usdc ?? 0).toFixed(4)}`}
           </div>
-          <div className="mt-0.5 text-[10px] text-zinc-600">Public-tier hires that settled to your on-chain payout ledger.</div>
+          <div className="mt-0.5 text-[10px] text-on-surface-variant/50">Public-tier hires that settled to your on-chain payout ledger.</div>
         </div>
 
         {/* Cross-rail balance breakdown so the seller isn't confused when the
@@ -860,35 +887,35 @@ function WithdrawModal({ state, setState, onClose, address, signTransaction, onW
         {(Number(state.escrow_locked_usdc) > 0 || Number(state.direct_paid_usdc) > 0) && (
           <div className="grid grid-cols-2 gap-2">
             {Number(state.escrow_locked_usdc) > 0 && (
-              <div className="rounded-lg border border-amber-800/50 bg-amber-950/10 p-3">
-                <div className="text-[10px] uppercase tracking-wider text-amber-300">Locked in escrow</div>
-                <div className="mt-1 font-mono text-lg font-semibold text-amber-100">
+              <div className="rounded-lg border border-tertiary-container/50 bg-tertiary-container/10 p-3">
+                <div className="text-[10px] uppercase tracking-wider text-tertiary-container">Locked in escrow</div>
+                <div className="mt-1 font-mono text-lg font-semibold text-tertiary-container">
                   ${Number(state.escrow_locked_usdc).toFixed(4)}
                 </div>
-                <div className="mt-0.5 text-[10px] text-zinc-500">Pending buyer approval or dispute resolution.</div>
+                <div className="mt-0.5 text-[10px] text-on-surface-variant/70">Pending buyer approval or dispute resolution.</div>
               </div>
             )}
             {Number(state.direct_paid_usdc) > 0 && (
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-3">
-                <div className="text-[10px] uppercase tracking-wider text-zinc-400">Paid direct to wallet</div>
-                <div className="mt-1 font-mono text-lg font-semibold text-zinc-200">
+              <div className="rounded-lg border border-outline-variant/40 bg-surface-container-low p-3">
+                <div className="text-[10px] uppercase tracking-wider text-on-surface-variant">Paid direct to wallet</div>
+                <div className="mt-1 font-mono text-lg font-semibold text-on-surface">
                   ${Number(state.direct_paid_usdc).toFixed(4)}
                 </div>
-                <div className="mt-0.5 text-[10px] text-zinc-500">Private / released-escrow rails — already in your USDC balance.</div>
+                <div className="mt-0.5 text-[10px] text-on-surface-variant/70">Private / released-escrow rails — already in your USDC balance.</div>
               </div>
             )}
           </div>
         )}
 
         {state.hint && !state.loading && noBalance && (
-          <p className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-400">
+          <p className="rounded-lg border border-outline-variant/40 bg-background p-3 text-xs text-on-surface-variant">
             💡 {state.hint}
           </p>
         )}
 
         {!noBalance && (
           <label className="block">
-            <span className="mb-1 block text-xs uppercase tracking-wider text-zinc-500">Amount to withdraw (USDC)</span>
+            <span className="mb-1 block text-xs uppercase tracking-wider text-on-surface-variant/70">Amount to withdraw (USDC)</span>
             <input
               type="number"
               step="0.0001"
@@ -897,29 +924,29 @@ function WithdrawModal({ state, setState, onClose, address, signTransaction, onW
               value={state.amount_usdc}
               onChange={(e) => setState({ ...state, amount_usdc: e.target.value })}
               disabled={state.loading || busy}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 font-mono text-sm focus:border-emerald-500 focus:outline-none"
+              className="w-full rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2 font-mono text-sm focus:border-primary-container focus:outline-none"
             />
-            <p className="mt-1 text-[10px] text-zinc-500">
+            <p className="mt-1 text-[10px] text-on-surface-variant/70">
               default = full balance; partial withdraws leave the remainder on-chain
             </p>
           </label>
         )}
 
-        {state.status && <p className="text-sm text-emerald-300">{state.status}</p>}
-        {state.err && <p className="text-sm text-red-400">{state.err}</p>}
+        {state.status && <p className="text-sm text-primary-container">{state.status}</p>}
+        {state.err && <p className="text-sm text-error">{state.err}</p>}
 
         <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
             disabled={busy}
-            className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:border-zinc-500 disabled:opacity-50"
+            className="rounded-lg border border-outline-variant/60 px-4 py-2 text-sm text-on-surface-variant hover:border-outline-variant disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={submit}
             disabled={state.loading || busy || noBalance}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
+            className="rounded-lg bg-primary-container text-on-primary px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
           >
             {busy ? 'Working…' : noBalance ? 'Nothing to withdraw' : 'Sign & withdraw'}
           </button>
@@ -941,7 +968,7 @@ function TxLink({ label, hash }: { label: string; hash: string | null }) {
       href={url}
       target="_blank"
       rel="noreferrer"
-      className="rounded border border-zinc-700 px-1.5 py-0.5 font-mono text-[9px] uppercase text-zinc-400 hover:border-emerald-500 hover:text-emerald-300"
+      className="rounded border border-outline-variant/60 px-1.5 py-0.5 font-mono text-[9px] uppercase text-on-surface-variant hover:border-primary-container hover:text-primary-container"
       title={`${label} tx: ${hash}`}
     >
       {label} ↗
@@ -949,17 +976,85 @@ function TxLink({ label, hash }: { label: string; hash: string | null }) {
   );
 }
 
+// usePaged — client-side pagination primitive (PRD-U follow-up 2026-07-08).
+//
+// SRP: owns page cursor + derives the visible slice. Nothing more.
+// Clamps `page` down when the underlying array shrinks (e.g., after a
+// refetch that returns fewer rows) so the caller never has to reset by
+// hand. Cheap enough for lists in the low-hundreds; server-side offset
+// pagination would kick in above that threshold.
+function usePaged<T>(items: readonly T[], pageSize: number) {
+  const [page, setPage] = useState(0);
+  const total = items.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const clampedPage = Math.min(page, pageCount - 1);
+
+  useEffect(() => {
+    if (page !== clampedPage) setPage(clampedPage);
+  }, [clampedPage, page]);
+
+  const start = clampedPage * pageSize;
+  const end = Math.min(start + pageSize, total);
+  return {
+    pageItems: items.slice(start, end),
+    page: clampedPage,
+    pageCount,
+    total,
+    start,
+    end,
+    canPrev: clampedPage > 0,
+    canNext: clampedPage < pageCount - 1,
+    prev: () => setPage((p) => Math.max(p - 1, 0)),
+    next: () => setPage((p) => Math.min(p + 1, pageCount - 1)),
+    setPage,
+  };
+}
+
+// Pager — dumb visual for the pagination cursor. Hides itself when the
+// list fits on one page (pageCount <= 1). Match Luminous Utility tokens.
+function Pager(props: {
+  page: number;
+  pageCount: number;
+  start: number;
+  end: number;
+  total: number;
+  canPrev: boolean;
+  canNext: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  if (props.pageCount <= 1) return null;
+  const btn =
+    'rounded-full border border-outline-variant/60 px-3 py-1 text-on-surface-variant transition-colors hover:border-primary-container hover:text-primary-container disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-outline-variant/60 disabled:hover:text-on-surface-variant';
+  return (
+    <nav
+      aria-label="Pagination"
+      className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs"
+    >
+      <button type="button" onClick={props.onPrev} disabled={!props.canPrev} className={btn}>
+        ‹ Prev
+      </button>
+      <span className="font-mono text-on-surface-variant/70">
+        {props.start + 1}–{props.end} of {props.total} · page {props.page + 1} of {props.pageCount}
+      </span>
+      <button type="button" onClick={props.onNext} disabled={!props.canNext} className={btn}>
+        Next ›
+      </button>
+    </nav>
+  );
+}
+
 function StatusPill({ status }: { status: string }) {
   const style =
-    status === 'answered' ? 'border-amber-600/50 text-amber-200'
-    : status === 'funded' ? 'border-emerald-700/50 text-emerald-200'
-    : status === 'approved' ? 'border-emerald-500/50 text-emerald-100'
-    : status === 'released' ? 'border-emerald-400/50 text-emerald-100 bg-emerald-900/20'
-    : status === 'disputed' ? 'border-red-600/50 text-red-200'
-    : status === 'resolved' ? 'border-amber-500/50 text-amber-100'
-    : status === 'refunded' ? 'border-zinc-500/50 text-zinc-200'
-    : status === 'deploying' ? 'border-zinc-600/50 text-zinc-400'
-    : 'border-zinc-700/50 text-zinc-300';
+    status === 'answered' ? 'border-tertiary-container/50 text-tertiary-container'
+    : status === 'funded' ? 'border-primary-container/40 text-primary-container'
+    : status === 'approved' ? 'border-primary-container/50 text-primary-container'
+    : status === 'released' ? 'border-primary-container/50 bg-primary-container/10 text-primary-container'
+    : status === 'disputed' ? 'border-error/50 text-error'
+    : status === 'resolved' ? 'border-tertiary-container/50 text-tertiary-container'
+    : status === 'refunded' ? 'border-outline-variant/60 text-on-surface'
+    : status === 'deploying' ? 'border-outline-variant/50 text-on-surface-variant'
+    : 'border-outline-variant/60 text-on-surface-variant';
   return (
     <span className={`rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase ${style}`}>
       {status}
@@ -1052,21 +1147,21 @@ function BudgetAndEarningsSection() {
     <section className="space-y-4">
       {/* Earnings & spend summary */}
       {(showBuyer || showSeller) && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-semibold text-slate-800">📊 Earnings & spend (30 days)</h2>
+        <div className="rounded-xl border border-outline-variant/40 bg-surface-container p-4">
+          <h2 className="mb-3 text-sm font-semibold text-on-surface">📊 Earnings & spend (30 days)</h2>
           <div className={`grid grid-cols-1 gap-4 ${FEATURE_M2_YIELD && budget.yieldSummary ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
             {showBuyer && (
               <div>
-                <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">You spent</p>
+                <p className="mb-2 text-xs uppercase tracking-wide text-on-surface-variant/70">You spent</p>
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.entries(buyer!.total_spent).length ? Object.entries(buyer!.total_spent) : [['USDC', '0']]).map(([code, amt]) => (
-                    <div key={code} className="rounded-lg bg-slate-50 p-3">
-                      <div className="font-mono text-lg text-slate-900">{amt}</div>
-                      <div className="text-xs text-slate-500">{code}</div>
+                    <div key={code} className="rounded-lg bg-surface-container-high p-3">
+                      <div className="font-mono text-lg text-on-surface">{amt}</div>
+                      <div className="text-xs text-on-surface-variant/70">{code}</div>
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-on-surface-variant/70">
                   {buyer!.active_vaults} active budget{buyer!.active_vaults === 1 ? '' : 's'} ·{' '}
                   {Object.entries(buyer!.hires_by_method).map(([m, n]) => `${n} ${m}`).join(' · ') || 'no hires yet'}
                 </p>
@@ -1074,16 +1169,16 @@ function BudgetAndEarningsSection() {
             )}
             {showSeller && (
               <div>
-                <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">You earned</p>
+                <p className="mb-2 text-xs uppercase tracking-wide text-on-surface-variant/70">You earned</p>
                 <div className="grid grid-cols-2 gap-2">
                   {(Object.entries(seller!.total_earned).length ? Object.entries(seller!.total_earned) : [['USDC', '0']]).map(([code, amt]) => (
-                    <div key={code} className="rounded-lg bg-emerald-50 p-3">
-                      <div className="font-mono text-lg text-slate-900">{amt}</div>
-                      <div className="text-xs text-emerald-700">{code}</div>
+                    <div key={code} className="rounded-lg bg-primary-container/10 p-3">
+                      <div className="font-mono text-lg text-on-surface">{amt}</div>
+                      <div className="text-xs text-primary-container">{code}</div>
                     </div>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-on-surface-variant/70">
                   {seller!.hires_received} hire{seller!.hires_received === 1 ? '' : 's'} ·{' '}
                   {Object.entries(seller!.hires_by_method).map(([m, n]) => `${n} ${m}`).join(' · ')}
                   {seller!.top_asset ? ` · top: ${seller!.top_asset}` : ''}
@@ -1092,12 +1187,12 @@ function BudgetAndEarningsSection() {
             )}
             {FEATURE_M2_YIELD && budget.yieldSummary && (
               <div>
-                <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">🌾 Yield earned</p>
-                <div className="rounded-lg bg-emerald-50 p-3">
-                  <div className="font-mono text-lg text-slate-900">+{fmtStroops(budget.yieldSummary.this_month_stroops)}</div>
-                  <div className="text-xs text-emerald-700">this month</div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-on-surface-variant/70">🌾 Yield earned</p>
+                <div className="rounded-lg bg-primary-container/10 p-3">
+                  <div className="font-mono text-lg text-on-surface">+{fmtStroops(budget.yieldSummary.this_month_stroops)}</div>
+                  <div className="text-xs text-primary-container">this month</div>
                 </div>
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-on-surface-variant/70">
                   {budget.yieldSummary.active_vaults_with_boost} vault{budget.yieldSummary.active_vaults_with_boost === 1 ? '' : 's'} on {(budget.yieldSummary.boost_apy_bp / 100).toFixed(0)}% boost
                   {' · '}base {(budget.yieldSummary.base_apy_bp / 100).toFixed(0)}%
                 </p>
@@ -1108,34 +1203,34 @@ function BudgetAndEarningsSection() {
       )}
 
       {/* Budget vaults grid */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="rounded-xl border border-outline-variant/40 bg-surface-container p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-800">💰 Payment budgets ({budget.vaults.length})</h2>
+          <h2 className="text-sm font-semibold text-on-surface">💰 Payment budgets ({budget.vaults.length})</h2>
           <button
             type="button"
             onClick={() => setOpenForm({ mode: 'create' })}
-            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+            className="rounded-lg bg-primary-container px-3 py-1.5 text-xs font-medium text-on-primary hover:opacity-90"
           >
             + Create budget
           </button>
         </div>
 
         {flash && (
-          <p className="mb-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">{flash}</p>
+          <p className="mb-2 rounded-lg bg-primary-container/10 px-3 py-2 text-xs text-primary-container">{flash}</p>
         )}
         {budget.error && (
           <p className="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">{budget.error}</p>
         )}
 
         {budget.loading && budget.vaults.length === 0 ? (
-          <p className="text-xs text-slate-500">Loading vaults…</p>
+          <p className="text-xs text-on-surface-variant/70">Loading vaults…</p>
         ) : budget.vaults.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
+          <div className="rounded-lg border border-dashed border-outline-variant/60 bg-surface-container-high p-6 text-center text-sm text-on-surface-variant">
             No budget vaults yet.{' '}
-            <button onClick={() => setOpenForm({ mode: 'create' })} className="font-medium text-emerald-700 hover:underline">
+            <button onClick={() => setOpenForm({ mode: 'create' })} className="font-medium text-primary-container hover:underline">
               Create your first budget →
             </button>
-            <p className="mt-1 text-xs text-slate-500">Deposit once, hire many agents without a wallet signature per hire.</p>
+            <p className="mt-1 text-xs text-on-surface-variant/70">Deposit once, hire many agents without a wallet signature per hire.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">

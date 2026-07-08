@@ -59,26 +59,26 @@ export default function BudgetVaultAllowlistModal({ vault, onSubmit, onCancel }:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-        <h3 className="text-lg font-semibold text-slate-900">Edit allowlist</h3>
-        <p className="mt-1 text-xs text-slate-500">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl bg-surface-container p-6 shadow-xl">
+        <h3 className="text-lg font-semibold text-on-surface">Edit allowlist</h3>
+        <p className="mt-1 text-xs text-on-surface-variant/70">
           Vault: <span className="font-mono">{vault.contract_address.slice(0, 12)}…</span>
         </p>
 
         <div className="mt-4">
-          <label className="block text-sm font-medium text-slate-700">Allowlist mode</label>
+          <label className="block text-sm font-medium text-on-surface-variant">Allowlist mode</label>
           <div className="mt-2 flex flex-col gap-2 text-sm">
             {(['any', 'slugs', 'sellers'] as const).map((m) => (
               <label key={m} className="flex items-start gap-2">
                 <input
                   type="radio" checked={mode === m} onChange={() => setMode(m)}
-                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
+                  className="mt-1 text-primary-container focus:ring-primary-container"
                 />
                 <span>
                   <span className="font-medium">
                     {m === 'any' ? 'Any agent' : m === 'slugs' ? 'Specific agents' : 'Specific sellers'}
                   </span>
-                  <span className="ml-2 text-xs text-slate-500">
+                  <span className="ml-2 text-xs text-on-surface-variant/70">
                     {m === 'any' ? 'Server relays hires against any published agent.' :
                      m === 'slugs' ? 'Whitelist by agent slug.' :
                      'Whitelist by seller G-address.'}
@@ -91,9 +91,9 @@ export default function BudgetVaultAllowlistModal({ vault, onSubmit, onCancel }:
 
         {mode !== 'any' && (
           <div className="mt-4">
-            <label className="block text-sm font-medium text-slate-700">
+            <label className="block text-sm font-medium text-on-surface-variant">
               {mode === 'slugs' ? 'Agent slugs' : 'Seller G-addresses'}
-              <span className="ml-2 text-xs font-normal text-slate-500">(one per line, or comma-separated)</span>
+              <span className="ml-2 text-xs font-normal text-on-surface-variant/70">(one per line, or comma-separated)</span>
             </label>
             <textarea
               value={raw}
@@ -102,12 +102,12 @@ export default function BudgetVaultAllowlistModal({ vault, onSubmit, onCancel }:
               placeholder={mode === 'slugs'
                 ? 'translator-en-vi\nlegal-review'
                 : 'GABCDEFGH…\nGIJKLMNOP…'}
-              className="mt-1 block w-full rounded-lg border-slate-300 font-mono text-xs shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
+              className="mt-1 block w-full rounded-lg border-outline-variant/60 font-mono text-xs shadow-sm focus:border-primary-container focus:ring-primary-container"
             />
           </div>
         )}
 
-        <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        <p className="mt-4 rounded-lg bg-surface-container-high px-3 py-2 text-xs text-on-surface-variant">
           <strong>Preview:</strong> {preview}
         </p>
 
@@ -118,14 +118,14 @@ export default function BudgetVaultAllowlistModal({ vault, onSubmit, onCancel }:
             type="button"
             onClick={onCancel}
             disabled={submitting}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-lg border border-outline-variant/60 bg-surface-container px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-high disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+            className="rounded-lg bg-primary-container px-4 py-2 text-sm font-medium text-on-primary hover:opacity-90 disabled:opacity-50"
           >
             {submitting ? 'Signing…' : 'Sign & apply'}
           </button>

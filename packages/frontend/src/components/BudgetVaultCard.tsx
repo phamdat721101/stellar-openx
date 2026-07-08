@@ -47,10 +47,10 @@ const STATUS_LABEL: Record<BudgetVault['status'], string> = {
 };
 
 const STATUS_COLOR: Record<BudgetVault['status'], string> = {
-  deploying: 'text-amber-700 bg-amber-50 border-amber-200',
-  active: 'text-emerald-800 bg-emerald-50 border-emerald-200',
-  paused: 'text-slate-700 bg-slate-100 border-slate-200',
-  closed: 'text-slate-500 bg-slate-100 border-slate-200',
+  deploying: 'text-tertiary-container bg-tertiary-container/10 border-tertiary-container/40',
+  active: 'text-primary-container bg-primary-container/10 border-primary-container/40',
+  paused: 'text-on-surface-variant bg-surface-container border-outline-variant/40',
+  closed: 'text-on-surface-variant/70 bg-surface-container border-outline-variant/40',
 };
 
 function shorten(addr: string, chars = 6): string {
@@ -76,12 +76,12 @@ function RewardBadge(props: {
   if (!YIELD_ENABLED) return null;
   const month = fromStroopsFmt(props.monthStroops);
   const boostChip = props.boostDaysRemaining > 0
-    ? <span className="ml-1 rounded-sm bg-emerald-100 px-1 text-emerald-800">boost {props.boostDaysRemaining}d</span>
+    ? <span className="ml-1 rounded-sm bg-primary-container/20 px-1 text-primary-container">boost {props.boostDaysRemaining}d</span>
     : null;
   return (
-    <div className="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200">
+    <div className="mt-2 inline-flex items-center gap-1 rounded-md bg-primary-container/10 px-2 py-1 text-xs font-medium text-primary-container ring-1 ring-primary-container/40">
       <span>+{month} {props.assetCode}</span>
-      <span className="text-emerald-600">this month · {(props.apyBp / 100).toFixed(1)}% APY</span>
+      <span className="text-primary-container">this month · {(props.apyBp / 100).toFixed(1)}% APY</span>
       {boostChip}
     </div>
   );
@@ -126,28 +126,28 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
   const disabled = vault.status !== 'active';
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-outline-variant/40 bg-surface-container p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-xs">
             <span className={`inline-flex rounded-full border px-2 py-0.5 font-medium ${STATUS_COLOR[vault.status]}`}>
               {STATUS_LABEL[vault.status]}
             </span>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-slate-600">
+            <span className="rounded-full border border-outline-variant/40 bg-surface-container-high px-2 py-0.5 font-mono text-on-surface-variant">
               {vault.asset_code}
             </span>
             <a
               href={contractExplorerUrl(vault.contract_address, vault.network)}
               target="_blank"
               rel="noreferrer"
-              className="text-slate-500 hover:text-slate-700"
+              className="text-on-surface-variant/70 hover:text-on-surface-variant"
               title="View on Stellar Expert"
             >
               {shorten(vault.contract_address)}
             </a>
             <button
               type="button"
-              className="text-slate-400 hover:text-slate-600"
+              className="text-on-surface-variant/60 hover:text-on-surface-variant"
               onClick={() => {
                 navigator.clipboard.writeText(vault.contract_address).then(() => {
                   setCopied(true);
@@ -159,10 +159,10 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
             </button>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-semibold text-slate-900">{balance}</span>
-            <span className="text-sm text-slate-500">{vault.asset_code} available</span>
+            <span className="text-3xl font-semibold text-on-surface">{balance}</span>
+            <span className="text-sm text-on-surface-variant/70">{vault.asset_code} available</span>
           </div>
-          <div className="mt-1 text-xs text-slate-500">
+          <div className="mt-1 text-xs text-on-surface-variant/70">
             {vault.hire_count} hire{vault.hire_count === 1 ? '' : 's'} · {vault.total_spent} {vault.asset_code} spent
             {vault.per_hire_cap ? ` · cap ${vault.per_hire_cap}/hire` : ''}
             {' · '}<AllowlistSummary vault={vault} />
@@ -184,7 +184,7 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
           type="button"
           onClick={onTopup}
           disabled={disabled}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-primary-container px-3 py-1.5 text-xs font-medium text-on-primary hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Top up
         </button>
@@ -192,7 +192,7 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
           type="button"
           onClick={onWithdraw}
           disabled={Number(balance) <= 0}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg border border-outline-variant/60 bg-surface-container px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
         >
           Withdraw
         </button>
@@ -200,7 +200,7 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
           type="button"
           onClick={onEditAllowlist}
           disabled={disabled}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg border border-outline-variant/60 bg-surface-container px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50"
         >
           Edit allowlist
         </button>
@@ -208,7 +208,7 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
           <button
             type="button"
             onClick={onPause}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-outline-variant/60 bg-surface-container px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-high"
           >
             Pause
           </button>
@@ -216,7 +216,7 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
           <button
             type="button"
             onClick={() => onPause()}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-lg border border-outline-variant/60 bg-surface-container px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-high"
           >
             Resume
           </button>
@@ -225,7 +225,7 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
           type="button"
           onClick={onClose}
           disabled={vault.status === 'closed'}
-          className="ml-auto rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="ml-auto rounded-lg border border-rose-200 bg-surface-container px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Close vault
         </button>
@@ -234,17 +234,17 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
       <button
         type="button"
         onClick={() => setShowHires((v) => !v)}
-        className="mt-3 flex w-full items-center justify-between text-xs text-slate-500 hover:text-slate-700"
+        className="mt-3 flex w-full items-center justify-between text-xs text-on-surface-variant/70 hover:text-on-surface-variant"
       >
         <span>{showHires ? '▼' : '▶'} Recent hires ({vault.hire_count})</span>
       </button>
 
       {showHires && (
-        <div className="mt-2 space-y-1 rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
+        <div className="mt-2 space-y-1 rounded-lg bg-surface-container-high p-3 text-xs text-on-surface-variant">
           {hires === null ? (
-            <div className="text-slate-400">Loading…</div>
+            <div className="text-on-surface-variant/60">Loading…</div>
           ) : hires.length === 0 ? (
-            <div className="text-slate-400">No hires yet — vault is fresh.</div>
+            <div className="text-on-surface-variant/60">No hires yet — vault is fresh.</div>
           ) : (
             hires.map((h) => {
               const explorerUrl = stellarExplorerTxUrl(h.tx_hash, vault.network);
@@ -254,9 +254,9 @@ export default function BudgetVaultCard({ vault, onTopup, onWithdraw, onEditAllo
                   <span className="ml-2 whitespace-nowrap">
                     {h.amount_usdc} {h.asset_code}{' '}
                     {explorerUrl ? (
-                      <a href={explorerUrl} target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline">tx↗</a>
+                      <a href={explorerUrl} target="_blank" rel="noreferrer" className="text-primary-container hover:underline">tx↗</a>
                     ) : (
-                      <span className="text-slate-400">{h.method}</span>
+                      <span className="text-on-surface-variant/60">{h.method}</span>
                     )}
                   </span>
                 </div>

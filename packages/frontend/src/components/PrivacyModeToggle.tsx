@@ -34,17 +34,17 @@ export function PrivacyModeToggle({
   const escrowPrice = (base * escrowMultiplier).toFixed(2);
 
   return (
-    <div className="inline-flex flex-wrap gap-1 rounded-lg border border-zinc-700 p-1 text-sm">
+    <div className="inline-flex flex-wrap gap-1 rounded-lg border border-outline-variant/60 p-1 text-sm">
       <button
         onClick={() => onChange('public')}
-        className={`rounded px-3 py-1 ${mode === 'public' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white'}`}
+        className={`rounded px-3 py-1 ${mode === 'public' ? 'bg-surface-container-high text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         title="Instant settlement; buyer and seller both visible on Stellar Expert"
       >
         Public · ${basePriceUsdc}
       </button>
       <button
         onClick={() => onChange('private')}
-        className={`rounded px-3 py-1 ${mode === 'private' ? 'bg-emerald-700 text-white' : 'text-zinc-400 hover:text-white'}`}
+        className={`rounded px-3 py-1 ${mode === 'private' ? 'bg-primary-container text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
         title="Privacy Pool — amount and counterparty are hidden on-chain"
       >
         Private · ${privatePrice}
@@ -52,7 +52,7 @@ export function PrivacyModeToggle({
       {escrowEnabled && (
         <button
           onClick={() => onChange('escrow')}
-          className={`rounded px-3 py-1 ${mode === 'escrow' ? 'bg-amber-700 text-white' : 'text-zinc-400 hover:text-white'}`}
+          className={`rounded px-3 py-1 ${mode === 'escrow' ? 'bg-tertiary-container text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
           title="Trustless Work escrow — funds held on-chain until you approve the delivered answer (24h auto-release)"
         >
           Escrow · ${escrowPrice}

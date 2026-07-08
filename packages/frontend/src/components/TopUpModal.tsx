@@ -13,7 +13,7 @@ interface Props {
 }
 
 /**
- * TopUpModal — fiat onramp via Coinflow Stellar.
+ * TopUpModal — fiat onramp via Coinflow Stellar (PRD-U restyle, 2026-07-08).
  *
  * Step 1: buyer picks pack → API mints a SEP-24 deposit session.
  * Step 2: hosted iframe handles SEPA / Apple Pay / Card.
@@ -68,32 +68,38 @@ export function TopUpModal({ open, onClose, onSuccess }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="w-full max-w-lg rounded-xl bg-zinc-900 p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Top up USDC</h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-margin-mobile">
+      <div className="w-full max-w-lg rounded-2xl border border-outline-variant/40 bg-surface-container-high p-lg shadow-2xl">
+        <div className="mb-md flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-on-surface">Top up USDC</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="text-on-surface-variant hover:text-on-surface"
+          >
             ✕
           </button>
         </div>
         {!hostedUrl ? (
           <>
-            <p className="mb-4 text-sm text-zinc-400">
+            <p className="mb-md text-sm text-on-surface-variant">
               Pay by SEPA, card, or Apple Pay. USDC arrives in your Stellar wallet in ≤15s.
             </p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-md">
               {PACKS.map((p) => (
                 <button
                   key={p}
+                  type="button"
                   onClick={() => buyPack(p)}
-                  className="rounded-lg border border-zinc-700 py-4 hover:bg-zinc-800"
+                  className="rounded-lg border border-outline-variant/60 py-md transition-colors hover:border-primary-container/60 hover:bg-surface-container"
                 >
-                  <div className="text-xl font-semibold">${p}</div>
-                  <div className="text-xs text-zinc-400">{p} USDC</div>
+                  <div className="font-mono text-xl font-semibold text-on-surface">${p}</div>
+                  <div className="text-xs text-on-surface-variant">{p} USDC</div>
                 </button>
               ))}
             </div>
-            {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+            {error && <p className="mt-md text-sm text-error">{error}</p>}
           </>
         ) : (
           <iframe src={hostedUrl} className="h-[500px] w-full rounded-lg" title="Coinflow Stellar deposit" />

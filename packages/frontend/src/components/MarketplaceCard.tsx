@@ -2,6 +2,9 @@
 
 import Link from 'next/link';
 
+/**
+ * MarketplaceCard — /browse grid tile (PRD-U restyle, 2026-07-08).
+ */
 export interface MarketplaceCardProps {
   id: string;
   slug: string;
@@ -15,25 +18,27 @@ export function MarketplaceCard(props: MarketplaceCardProps) {
   return (
     <Link
       href={`/agent/${props.id}`}
-      className="group flex h-full flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-5 hover:border-emerald-500/40"
+      className="group flex h-full flex-col gap-md rounded-2xl border border-outline-variant/40 bg-surface-container-low p-lg transition-colors hover:border-primary-container/60"
     >
-      <div className="flex items-start justify-between gap-2">
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase text-emerald-400">
+      <div className="flex items-start justify-between gap-sm">
+        <span className="inline-flex items-center gap-xs rounded-full bg-primary-container/10 px-sm py-xs text-[10px] uppercase tracking-wider text-primary-container">
           Agent
         </span>
         {props.acceptsPrivate && (
-          <span className="rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] text-purple-300">
+          <span className="rounded-full bg-tertiary-container/20 px-sm py-xs text-[10px] text-on-tertiary-container">
             Privacy ready
           </span>
         )}
       </div>
-      <div className="space-y-1">
-        <h3 className="font-semibold leading-snug group-hover:text-emerald-300">{props.title}</h3>
-        {props.description && <p className="line-clamp-2 text-sm text-zinc-400">{props.description}</p>}
+      <div className="space-y-xs">
+        <h3 className="font-semibold leading-snug text-on-surface group-hover:text-primary-container">{props.title}</h3>
+        {props.description && (
+          <p className="line-clamp-2 text-sm text-on-surface-variant">{props.description}</p>
+        )}
       </div>
-      <div className="mt-auto flex items-center justify-between border-t border-zinc-800 pt-3 text-xs text-zinc-500">
+      <div className="mt-auto flex items-center justify-between border-t border-outline-variant/40 pt-md text-xs text-on-surface-variant/70">
         <span className="font-mono">/api/v1/{props.slug}</span>
-        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-mono text-emerald-300">
+        <span className="rounded-full bg-primary-container/10 px-sm py-xs font-mono text-primary-container">
           ${Number(props.priceUsdc).toFixed(2)} · Hire
         </span>
       </div>

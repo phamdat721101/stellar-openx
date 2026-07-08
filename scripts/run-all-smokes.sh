@@ -9,6 +9,16 @@ cd "$ROOT"
 echo "▶︎ smoke: cargo unit tests (offline; no Stellar network)"
 cargo test --manifest-path packages/soroban-contracts/Cargo.toml --quiet
 
+echo "▶︎ smoke: token-hygiene (PRD-U regression guard)"
+bash scripts/check-token-hygiene.sh
+
+# PRD-U (2026-07-08) — auditor agent seed for the "Audit a Soroban contract"
+# pill on the v2 homepage. Gated behind SEED_AUDITOR=1 to keep CI focused.
+if [ "${SEED_AUDITOR:-0}" = "1" ]; then
+  echo "▶︎ seed: soroban-auditor lighthouse agent"
+  npx tsx scripts/seed-auditor-agent.ts || echo "⚠ auditor seed skipped (already exists or API down)"
+fi
+
 echo "▶︎ smoke: marketplace e2e"
 npx tsx scripts/smoke-stellar-marketplace-e2e.ts
 

@@ -87,56 +87,56 @@ function MintForm() {
   return (
     <section
       id="mint"
-      className="scroll-mt-24 space-y-4 rounded-xl border border-emerald-700/30 bg-zinc-900/60 p-6"
+      className="scroll-mt-24 space-y-4 rounded-xl border border-primary-container/40 bg-surface-container-low p-6"
     >
       <header className="space-y-1">
-        <p className="font-mono text-xs uppercase tracking-wider text-emerald-400">
+        <p className="font-mono text-xs uppercase tracking-wider text-primary-container">
           ⭐ Mint by prompt
         </p>
         <h2 className="text-2xl font-bold">Publish an AI agent in one sentence.</h2>
-        <p className="text-sm text-zinc-400">
-          Describe your agent. The concierge LLM extracts a manifest, probes <code className="font-mono text-zinc-300">/openx/health</code>, and puts it live on Stellar in about 10s. No wallet needed to mint — bind a Stellar payout address later.
+        <p className="text-sm text-on-surface-variant">
+          Describe your agent. The concierge LLM extracts a manifest, probes <code className="font-mono text-on-surface-variant">/openx/health</code>, and puts it live on Stellar in about 10s. No wallet needed to mint — bind a Stellar payout address later.
         </p>
       </header>
 
       <label className="block space-y-1">
-        <span className="text-sm font-medium text-zinc-300">Describe your agent</span>
+        <span className="text-sm font-medium text-on-surface-variant">Describe your agent</span>
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder={EXAMPLE_PROMPT}
           maxLength={2000}
-          className="block h-32 w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm focus:border-emerald-500 focus:outline-none"
+          className="block h-32 w-full resize-none rounded-lg border border-outline-variant/40 bg-background p-3 text-sm focus:border-primary-container focus:outline-none"
         />
-        <span className="text-xs text-zinc-500">{prompt.length} / 2000 (min 30)</span>
+        <span className="text-xs text-on-surface-variant/70">{prompt.length} / 2000 (min 30)</span>
       </label>
 
       <label className="block space-y-1">
-        <span className="text-sm font-medium text-zinc-300">Operator email (optional)</span>
+        <span className="text-sm font-medium text-on-surface-variant">Operator email (optional)</span>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="block w-full rounded-lg border border-zinc-800 bg-zinc-950 p-2 text-sm focus:border-emerald-500 focus:outline-none"
+          className="block w-full rounded-lg border border-outline-variant/40 bg-background p-2 text-sm focus:border-primary-container focus:outline-none"
         />
       </label>
 
       <button
         onClick={submit}
         disabled={loading || prompt.trim().length < 30}
-        className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+        className="rounded-lg bg-primary-container text-on-primary px-5 py-2 text-sm font-medium hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? 'Publishing… (~10s)' : 'Mint agent on Stellar'}
       </button>
 
       {live && (
-        <div className="space-y-3 rounded-lg border-l-4 border-emerald-500 bg-emerald-950/30 p-5 text-sm">
-          <h3 className="text-base font-bold text-emerald-300">✓ Live on Stellar</h3>
-          <p className="text-zinc-200">{live.message}</p>
+        <div className="space-y-3 rounded-lg border-l-4 border-primary-container bg-primary-container/10 p-5 text-sm">
+          <h3 className="text-base font-bold text-primary-container">✓ Live on Stellar</h3>
+          <p className="text-on-surface">{live.message}</p>
           <dl className="grid gap-1.5 text-xs">
             <Kv k="Marketplace">
-              <Link href={`/agent/${live.agent_id}`} className="text-emerald-400 underline">
+              <Link href={`/agent/${live.agent_id}`} className="text-primary-container underline">
                 /agent/{live.agent_id}
               </Link>
             </Kv>
@@ -145,7 +145,7 @@ function MintForm() {
             </Kv>
             <Kv k="Verification">
               {live.verification_status === 'verified' ? (
-                <span className="rounded bg-emerald-900/60 px-1.5 py-0.5 font-mono text-emerald-300">
+                <span className="rounded bg-primary-container/20 px-1.5 py-0.5 font-mono text-primary-container">
                   ✓ reachable
                 </span>
               ) : (
@@ -161,16 +161,16 @@ function MintForm() {
               <span className="font-medium">Try it from a terminal</span>
               <button
                 onClick={() => copyCurl(live.curl_example)}
-                className="text-xs text-emerald-400 hover:underline"
+                className="text-xs text-primary-container hover:underline"
               >
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
-            <pre className="overflow-x-auto rounded bg-black/40 p-3 font-mono text-[11px] text-emerald-200">
+            <pre className="overflow-x-auto rounded bg-black/40 p-3 font-mono text-[11px] text-primary-container">
               {live.curl_example}
             </pre>
           </div>
-          <ul className="space-y-1 text-zinc-300">
+          <ul className="space-y-1 text-on-surface-variant">
             {live.next_steps.map((s, i) => (
               <li key={i}>→ {s}</li>
             ))}
@@ -181,7 +181,7 @@ function MintForm() {
       {clarify && (
         <div className="rounded-lg border-l-4 border-yellow-500 bg-yellow-950/30 p-4 text-sm">
           <h3 className="font-bold text-yellow-300">Need a bit more info</h3>
-          <p className="mt-1 text-zinc-200">{clarify.message}</p>
+          <p className="mt-1 text-on-surface">{clarify.message}</p>
           {clarify.missing_fields?.length > 0 && (
             <p className="mt-1 text-xs text-yellow-200">Missing: {clarify.missing_fields.join(', ')}</p>
           )}
@@ -189,11 +189,11 @@ function MintForm() {
       )}
 
       {dup && (
-        <div className="rounded-lg border-l-4 border-amber-500 bg-amber-950/30 p-4 text-sm">
-          <h3 className="font-bold text-amber-300">Slug already in use</h3>
-          <p className="mt-1 text-zinc-200">
+        <div className="rounded-lg border-l-4 border-tertiary-container bg-tertiary-container/10 p-4 text-sm">
+          <h3 className="font-bold text-tertiary-container">Slug already in use</h3>
+          <p className="mt-1 text-on-surface">
             <code className="font-mono">/{dup.slug}</code> exists.{' '}
-            <Link href={`/agent/${dup.slug}`} className="text-amber-300 underline">
+            <Link href={`/agent/${dup.slug}`} className="text-tertiary-container underline">
               View →
             </Link>
           </p>
@@ -201,9 +201,9 @@ function MintForm() {
       )}
 
       {errResult && (
-        <div className="rounded-lg border-l-4 border-red-500 bg-red-950/30 p-4 text-sm">
-          <h3 className="font-bold text-red-300">Something went wrong</h3>
-          <p className="mt-1 text-zinc-200">{errResult.message ?? errResult.error}</p>
+        <div className="rounded-lg border-l-4 border-error bg-error/10 p-4 text-sm">
+          <h3 className="font-bold text-error">Something went wrong</h3>
+          <p className="mt-1 text-on-surface">{errResult.message ?? errResult.error}</p>
         </div>
       )}
     </section>
@@ -213,7 +213,7 @@ function MintForm() {
 function Kv({ k, children }: { k: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-2">
-      <dt className="w-28 shrink-0 text-zinc-500">{k}</dt>
+      <dt className="w-28 shrink-0 text-on-surface-variant/70">{k}</dt>
       <dd className="min-w-0">{children}</dd>
     </div>
   );
@@ -286,12 +286,12 @@ export default function DocsPage() {
     <div className="mx-auto max-w-3xl space-y-8">
       <header>
         <h1 className="text-3xl font-bold">Docs</h1>
-        <p className="text-zinc-400">
+        <p className="text-on-surface-variant">
           OpenX-S is a single-chain agent marketplace on Stellar.{' '}
           <Link
             href="https://stellar.expert/explorer/testnet"
             target="_blank"
-            className="text-emerald-400 hover:underline"
+            className="text-primary-container hover:underline"
           >
             Stellar Expert ↗
           </Link>
@@ -307,7 +307,7 @@ export default function DocsPage() {
           <a
             key={s.id}
             href={`#${s.id}`}
-            className="rounded-full border border-zinc-700 px-3 py-1 text-zinc-400 hover:border-emerald-500"
+            className="rounded-full border border-outline-variant/60 px-3 py-1 text-on-surface-variant hover:border-primary-container"
           >
             {s.title}
           </a>
@@ -318,19 +318,19 @@ export default function DocsPage() {
         <section
           key={s.id}
           id={s.id}
-          className="scroll-mt-24 space-y-3 rounded-xl border border-zinc-800 bg-zinc-900 p-6"
+          className="scroll-mt-24 space-y-3 rounded-xl border border-outline-variant/40 bg-surface-container-low p-6"
         >
           <h2 className="text-xl font-semibold">{s.title}</h2>
-          <p className="whitespace-pre-line text-sm text-zinc-400">{s.body}</p>
-          <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 font-mono text-xs text-emerald-300">
+          <p className="whitespace-pre-line text-sm text-on-surface-variant">{s.body}</p>
+          <pre className="overflow-x-auto rounded-lg bg-black/40 p-4 font-mono text-xs text-primary-container">
             {s.code}
           </pre>
         </section>
       ))}
 
-      <p className="pt-4 text-center text-sm text-zinc-500">
+      <p className="pt-4 text-center text-sm text-on-surface-variant/70">
         Full reference at{' '}
-        <Link href={`${API}/openapi.json`} target="_blank" className="text-emerald-400 hover:underline">
+        <Link href={`${API}/openapi.json`} target="_blank" className="text-primary-container hover:underline">
           /openapi.json
         </Link>
         .
