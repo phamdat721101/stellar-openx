@@ -30,6 +30,9 @@ const PUBLIC_PATHS: RegExp[] = [
   /^\/discover$/,
   /^\/credits\/config$/,
   /^\/dashboard\/stats$/,
+  // PRD-T-S — Raven WorkOS OAuth redirect lands here from the browser with a
+  // `state=<owner>`; no wallet header is present yet, so it must be public.
+  /^\/raven\/oauth\/callback$/,
 ];
 
 const STELLAR_ADDR_RE = /^G[A-Z2-7]{55}$/;

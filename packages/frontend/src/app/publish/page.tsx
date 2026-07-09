@@ -27,6 +27,8 @@ import { useBudgetVaults, type BudgetVault, type DeployVaultInput } from '@/hook
 import BudgetVaultCard from '@/components/BudgetVaultCard';
 import BudgetVaultForm from '@/components/BudgetVaultForm';
 import BudgetVaultAllowlistModal from '@/components/BudgetVaultAllowlistModal';
+import { CertifiedBadge } from '@/components/CertifiedBadge';
+import { FEATURE_TRAINING } from '@/lib/uiFlags';
 import { API_URL, stellarExplorerTxUrl } from '@/lib/stellar';
 
 interface Agent {
@@ -37,6 +39,11 @@ interface Agent {
   published: boolean;
   soroban_agent_id: string | null;
   created_at: string;
+  // PRD-T-S — /v3/me/agents returns these; surface them as a stage pill + CTA
+  // so sellers actually discover the Stellar-Raven training flow after mint.
+  training_stage?: string | null;
+  cert_score?: number | null;
+  certified_at?: string | null;
 }
 
 interface AgentStat {
@@ -515,6 +522,29 @@ export default function StudioPage() {
                     >
                       Publish on-chain
                     </button>
+                  </div>
+                )}
+                {/* PRD-T-S — Stellar Raven training discovery. Deep-link into
+                    /agent/{id}#train where TrainingPanel lives. SRP: pure
+                    presentational block reading data already fetched. */}
+                {FEATURE_TRAINING && !pending && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <CertifiedBadge stage={a.training_stage} />
+                    <Link
+                      href={`/agent/${a.id}#train`}
+                      className={
+                        a.training_stage === 'certified' || a.training_stage === 'legacy_certified'
+                          ? 'rounded border border-outline-variant/60 px-2 py-1 text-xs text-on-surface-variant hover:border-primary-container hover:text-primary-container'
+                          : 'rounded border border-primary-container/60 bg-primary-container/10 px-2 py-1 text-xs font-medium text-primary-container hover:border-primary-container hover:text-primary-container'
+                      }
+                      title="Train this agent with Stellar Raven (Learn → Skill → Evaluate → Certify)"
+                    >
+                      {a.training_stage === 'certified' || a.training_stage === 'legacy_certified'
+                        ? 'View training'
+                        : a.training_stage && a.training_stage !== 'onboarded'
+                          ? `Resume training · ${a.training_stage}`
+                          : '🎓 Train with Stellar Raven'}
+                    </Link>
                   </div>
                 )}
                 <dl className="mt-4 flex items-center gap-6 text-xs text-on-surface-variant/70">

@@ -7,24 +7,16 @@
 # component must consume names like `primary-container`, `on-surface-variant`,
 # `outline-variant`.
 #
-# Exception: the pre-PRD-U legacy code paths inside `AppShell.tsx` and
-# `page.tsx` (guarded by FEATURE_UI_V2=false) are intentionally preserved
-# byte-identically for one-release rollback. Those two files are skipped.
+# The legacy UI has been fully removed — the entire frontend now consumes the
+# token set, so there is no allowlist. Any legacy palette hit fails CI.
 
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/packages/frontend/src"
 
-# Files with intentionally-preserved legacy code paths — allowlisted.
-ALLOWLIST=(
-  "packages/frontend/src/app/page.tsx"
-  "packages/frontend/src/components/AppShell.tsx"
-)
-
 PATTERN='(emerald-|zinc-|purple-|amber-|red-4|red-5|red-6|red-7|red-8|red-9|slate-|bg-white\b)'
 
-# Find hits outside the allowlist.
-HITS=$(grep -rEn "$PATTERN" "$SRC" 2>/dev/null | grep -v 'translate-y-\|translate-x-\|top-1/2\|top-2/\|bottom-1/2' | grep -v -F "$(printf '%s\n' "${ALLOWLIST[@]}")" || true)
+HITS=$(grep -rEn "$PATTERN" "$SRC" 2>/dev/null | grep -v 'translate-y-\|translate-x-\|top-1/2\|top-2/\|bottom-1/2' || true)
 
 if [ -n "$HITS" ]; then
   echo "❌ token-hygiene FAILED — legacy Tailwind palette hits found:"
@@ -35,4 +27,4 @@ if [ -n "$HITS" ]; then
   exit 1
 fi
 
-echo "✅ token-hygiene passed — no legacy palette hits outside allowlisted legacy paths"
+echo "✅ token-hygiene passed — no legacy palette hits in the frontend"

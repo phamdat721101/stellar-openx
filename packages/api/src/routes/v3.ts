@@ -13,7 +13,7 @@ import { logger } from '../lib';
 import { pool } from '../db';
 import type { AuthRequest } from '../middleware/auth';
 import { discoveryService } from '../services/discoveryService';
-import { listAgents, getAgent } from '../services/stellar/marketplace';
+import { listAgents, getAgent, getCertification } from '../services/stellar/marketplace';
 import { stroopsToUsdc } from '@openx/sdk';
 
 const router = Router();
@@ -26,7 +26,8 @@ router.get('/version', (_req, res) =>
 
 router.get('/agents', async (_req, res) => {
   const r = await pool.query(
-    `SELECT id, slug, owner_address, persona, pricing, published, soroban_agent_id, created_at
+    `SELECT id, slug, owner_address, persona, pricing, published, soroban_agent_id, created_at,
+            training_stage, cert_score, certified_at
        FROM agents
       WHERE published = true AND archived_at IS NULL
    ORDER BY created_at DESC
@@ -119,6 +120,17 @@ router.get('/registry/agents/:agent_id', async (req, res) => {
   res.json({ agent: { ...a, price_usdc: stroopsToUsdc(BigInt(a.price_stroops)) } });
 });
 
+// PRD-T-S — read the on-chain certification (trust anchor) for cross-checking
+// the DB badge. Public cross-check tool, same auth treatment as its sibling.
+router.get('/registry/agents/:agent_id/certification', async (req, res) => {
+  if (!/^[0-9a-f]{64}$/i.test(req.params.agent_id)) {
+    return res.status(400).json({ error: 'agent_id must be 32-byte hex' });
+  }
+  const cert = await getCertification(Buffer.from(req.params.agent_id, 'hex'));
+  if (!cert) return res.status(404).json({ error: 'agent not certified on chain' });
+  res.json({ certification: cert });
+});
+
 // ─── Owner-authed dashboard ───────────────────────────────────────────────
 
 router.get('/dashboard/stats', async (_req, res) => {
@@ -137,7 +149,8 @@ router.get('/dashboard/stats', async (_req, res) => {
 router.get('/me/agents', async (req: AuthRequest, res: Response) => {
   if (!req.user?.address) return res.status(401).json({ error: 'auth required' });
   const r = await pool.query(
-    `SELECT id, slug, persona, pricing, published, soroban_agent_id, created_at
+    `SELECT id, slug, persona, pricing, published, soroban_agent_id, created_at,
+            training_stage, cert_score, certified_at
        FROM agents
       WHERE owner_address = $1 AND archived_at IS NULL
    ORDER BY created_at DESC`,

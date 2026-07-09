@@ -23,6 +23,9 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { PrivacyModeToggle } from '@/components/PrivacyModeToggle';
+import { CertifiedBadge } from '@/components/CertifiedBadge';
+import { TrainingPanel } from '@/components/TrainingPanel';
+import { FEATURE_TRAINING } from '@/lib/uiFlags';
 import { useStellarWallet } from '@/hooks/useStellarWallet';
 import { useConnectedPrivacyMode } from '@/hooks/useConnectedPrivacyMode';
 import { useEscrowActions } from '@/hooks/useEscrowActions';
@@ -43,6 +46,9 @@ interface Agent {
   pricing: { x402?: string };
   soroban_agent_id: string | null;
   created_at: string;
+  training_stage?: string | null;
+  cert_score?: number | null;
+  certified_at?: string | null;
 }
 
 interface RecentCall {
@@ -396,6 +402,7 @@ export default function AgentDetailPage() {
           <span className="rounded-full border border-tertiary-container/40 bg-tertiary-container/15 px-2 py-0.5 font-mono text-[10px] uppercase text-on-tertiary-container">
             Privacy ready
           </span>
+          <CertifiedBadge stage={agent.training_stage} />
           <span className="font-mono text-[10px] text-on-surface-variant/70">/api/v1/{agent.slug}</span>
         </div>
         <h1 className="text-3xl font-bold tracking-tight">{agent.slug}</h1>
@@ -550,6 +557,11 @@ export default function AgentDetailPage() {
               </article>
             )}
           </section>
+
+          {/* Owner-only training console (PRD-T-S) */}
+          {FEATURE_TRAINING && address && agent.owner_address === address && (
+            <TrainingPanel agentId={agent.id} />
+          )}
         </div>
 
         {/* SIDEBAR 4/12 */}

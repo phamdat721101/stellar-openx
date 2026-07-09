@@ -55,4 +55,14 @@ if [ "${RUN_YIELD:-0}" = "1" ]; then
   fi
 fi
 
+# PRD-T-S — Agent Training Pipeline (S1→S5) gated behind RUN_TRAINING=1.
+# Raven fixture assertions run offline; HTTP asserts skip gracefully when the
+# API is down. Full on-chain drive is manual per TRAINING_DEPLOY.md.
+if [ "${RUN_TRAINING:-0}" = "1" ]; then
+  if [ -f scripts/smoke-training-e2e.ts ]; then
+    echo "▶︎ smoke: agent training pipeline (PRD-T-S)"
+    npx tsx scripts/smoke-training-e2e.ts
+  fi
+fi
+
 echo "✅ all smokes green"

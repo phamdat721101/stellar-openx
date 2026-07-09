@@ -7,5 +7,6 @@
  * rather than reading env in-place (SRP + easier to override in tests).
  */
 
-export const FEATURE_UI_V2: boolean =
-  process.env.NEXT_PUBLIC_FEATURE_UI_V2 === 'true';
+/** PRD-T-S — agent training pipeline UI (owner stepper + certified badge). */
+export const FEATURE_TRAINING: boolean =
+  process.env.NEXT_PUBLIC_FEATURE_TRAINING === 'true';

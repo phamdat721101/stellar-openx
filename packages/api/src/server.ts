@@ -18,6 +18,7 @@ import openapiRouter from './routes/openapi';
 import v3Router from './routes/v3';
 import v3MarketplaceRouter from './routes/v3-marketplace';
 import v3ConciergeRouter from './routes/v3-concierge';
+import v3TrainingRouter from './routes/v3-training';
 import v1PublicRouter from './routes/v1Public';
 import creditsTopupRouter from './routes/credits-topup';
 import {
@@ -47,6 +48,9 @@ app.get('/metrics', metricsHandler);
 app.use('/v3/concierge', v3ConciergeRouter);
 app.use('/v3', auth, v3Router);
 app.use('/v3/marketplace', auth, v3MarketplaceRouter);
+// PRD-T-S training pipeline (owner-authed; flag-gated inside the router). The
+// Raven OAuth callback is whitelisted in auth.ts as a public path.
+app.use('/v3/training', auth, v3TrainingRouter);
 
 // /api/v1 — paywalled. The Stellar payment gate is the auth (mounted per-route).
 app.use('/api/v1/credits', creditsTopupRouter);
@@ -125,6 +129,37 @@ if (process.env.FEATURE_M2_BUDGET_VAULT === 'true' && process.env.FEATURE_M2_VAU
     }
   }, YIELD_INTERVAL_MS).unref();
   logger.info({ interval_ms: YIELD_INTERVAL_MS }, 'yield:cron:enabled');
+}
+
+// PRD-T-S DGM iteration cron — weekly proposal pass over certified agents.
+// Ticks daily; runWeekly() is idempotent-safe via advisory lock + only acts on
+// the configured cadence. No-op unless both flags are on.
+const DGM_INTERVAL_MS = 24 * 60 * 60 * 1000;
+if (process.env.FEATURE_TRAINING === 'true' && process.env.FEATURE_TRAINING_DGM === 'true') {
+  setInterval(async () => {
+    try {
+      const { dgmIterationService } = await import('./services/dgmIterationService');
+      await dgmIterationService.runWeekly();
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, 'dgm:cron:tick:failed');
+    }
+  }, DGM_INTERVAL_MS).unref();
+  logger.info({ interval_ms: DGM_INTERVAL_MS }, 'dgm:cron:enabled');
+}
+
+// PRD-T-S re-certification cron — daily sweep downgrades expired certs to
+// legacy. Advisory-locked + idempotent. No-op unless both flags are on.
+const RECERT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+if (process.env.FEATURE_TRAINING === 'true' && process.env.FEATURE_TRAINING_RECERT === 'true') {
+  setInterval(async () => {
+    try {
+      const { certificationService } = await import('./services/certificationService');
+      await certificationService.runRecertification();
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, 'recert:cron:tick:failed');
+    }
+  }, RECERT_INTERVAL_MS).unref();
+  logger.info({ interval_ms: RECERT_INTERVAL_MS }, 'recert:cron:enabled');
 }
 
 installLifecycle(server);

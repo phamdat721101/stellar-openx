@@ -24,12 +24,28 @@ pub struct AgentMetadata {
     pub created_at: u64,
 }
 
+/// PRD-T-S — on-chain certification record for the training pipeline.
+/// Written by the platform registrar once an agent clears the S4 eval gate.
+/// `status` is one of the `symbol_short!` labels: certified | legacy | revoked.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Certification {
+    pub agent_id: BytesN<32>,
+    pub score_bps: u32,       // mean eval score in basis points (0-10000)
+    pub cert_hash: BytesN<32>,
+    pub version: u32,
+    pub certified_at: u64,
+    pub expires_at: u64,
+    pub status: Symbol,
+}
+
 #[contracttype]
 pub enum DataKey {
     Agent(BytesN<32>),
     Index(u32),
     Count,
     Admin,
+    Cert(BytesN<32>),
 }
 
 #[contracterror]
@@ -41,10 +57,17 @@ pub enum Error {
     Unauthorized = 3,
     NotFound = 4,
     InvalidPrice = 5,
+    InvalidScore = 6,
+    NotCertified = 7,
 }
 
 const EV_REG: Symbol = symbol_short!("reg");
 const EV_PRICE: Symbol = symbol_short!("price");
+const EV_CERT: Symbol = symbol_short!("cert");
+
+/// Certification validity window — 90 days, matched to the off-chain
+/// `agent_certifications.expires_at` default and the quarterly re-cert cron.
+const CERT_TTL_SECS: u64 = 90 * 86_400;
 
 #[contract]
 pub struct AgentRegistry;
@@ -145,6 +168,71 @@ impl AgentRegistry {
             i += 1;
         }
         out
+    }
+
+    // ── PRD-T-S certification (platform-registrar authored) ──────────────────
+
+    /// Award/renew an on-chain certification for `agent_id`. Only the admin
+    /// (platform registrar) may call — the platform relayer is the tx source,
+    /// so `admin.require_auth()` is satisfied by the source-account shortcut.
+    /// Re-running bumps `version` semantics off-chain; on-chain it overwrites.
+    pub fn certify_agent(
+        env: Env,
+        agent_id: BytesN<32>,
+        score_bps: u32,
+        cert_hash: BytesN<32>,
+        version: u32,
+    ) -> Certification {
+        Self::admin(&env).require_auth();
+        if score_bps > 10_000 {
+            panic_with_error!(&env, Error::InvalidScore);
+        }
+        // Certification presupposes the agent exists.
+        if !env.storage().persistent().has(&DataKey::Agent(agent_id.clone())) {
+            panic_with_error!(&env, Error::NotFound);
+        }
+        let now = env.ledger().timestamp();
+        let cert = Certification {
+            agent_id: agent_id.clone(),
+            score_bps,
+            cert_hash,
+            version,
+            certified_at: now,
+            expires_at: now + CERT_TTL_SECS,
+            status: symbol_short!("certified"),
+        };
+        env.storage().persistent().set(&DataKey::Cert(agent_id.clone()), &cert);
+        env.events().publish((EV_CERT, agent_id), score_bps);
+        cert
+    }
+
+    /// Downgrade a certification. `to_legacy=true` keeps earning enabled with a
+    /// disclosure banner (quarterly re-cert failure); `false` fully revokes.
+    pub fn revoke_certification(env: Env, agent_id: BytesN<32>, to_legacy: bool) {
+        Self::admin(&env).require_auth();
+        let mut cert: Certification = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Cert(agent_id.clone()))
+            .unwrap_or_else(|| panic_with_error!(&env, Error::NotCertified));
+        cert.status = if to_legacy {
+            symbol_short!("legacy")
+        } else {
+            symbol_short!("revoked")
+        };
+        env.storage().persistent().set(&DataKey::Cert(agent_id.clone()), &cert);
+        env.events().publish((EV_CERT, agent_id), cert.status.clone());
+    }
+
+    pub fn get_certification(env: Env, agent_id: BytesN<32>) -> Option<Certification> {
+        env.storage().persistent().get(&DataKey::Cert(agent_id))
+    }
+
+    fn admin(env: &Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized))
     }
 }
 

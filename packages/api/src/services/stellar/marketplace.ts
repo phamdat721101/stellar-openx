@@ -19,6 +19,16 @@ import { Address, Contract, nativeToScVal, scValToNative, xdr } from '@stellar/s
 import { getStellar } from './client';
 import type { PaymentMode } from '@openx/sdk';
 
+export interface OnChainCertification {
+  agent_id: string;    // hex-32
+  score_bps: number;
+  cert_hash: string;   // hex-32
+  version: number;
+  certified_at: number;
+  expires_at: number;
+  status: string;      // certified | legacy | revoked
+}
+
 export interface AgentSummary {
   agent_id: string;        // hex-32
   slug: string;
@@ -153,6 +163,132 @@ export async function buildAgentPayoutXdr(
   return prepared.toXDR();
 }
 
+/**
+ * submitCertifyAgent — PRD-T-S S5. Platform-registrar-authored on-chain
+ * certification: calls `certify_agent(agent_id, score_bps, cert_hash, version)`
+ * on agent-registry. The platform is the tx source, so `admin.require_auth()`
+ * is satisfied by the source-account shortcut — no buyer/seller wallet needed
+ * (LSP mirror of the treasury-signed `submitRewardTopup`).
+ *
+ * SOLID (SRP): only the agent-registry contract glue lives here; the cert
+ * record + badge state are certificationService's job.
+ */
+export async function submitCertifyAgent(
+  agentIdHex: string,
+  scoreBps: number,
+  certHashHex: string,
+  version: number,
+): Promise<{ hash: string }> {
+  const s = getStellar();
+  const agentId = Buffer.from(agentIdHex.replace(/^0x/, ''), 'hex');
+  const certHash = Buffer.from(certHashHex.replace(/^0x/, ''), 'hex');
+  const platform = s.platformKeypair.publicKey();
+  const tx = (await s.buildTx(platform))
+    .addOperation(
+      new Contract(s.contracts.agentRegistry).call(
+        'certify_agent',
+        nativeToScVal(agentId, { type: 'bytes' }),
+        nativeToScVal(scoreBps, { type: 'u32' }),
+        nativeToScVal(certHash, { type: 'bytes' }),
+        nativeToScVal(version, { type: 'u32' }),
+      ),
+    )
+    .build();
+  const prepared = await s.rpc.prepareTransaction(tx);
+  prepared.sign(s.platformKeypair);
+  const result = await s.submitPlatformSigned(prepared);
+  return { hash: result.hash };
+}
+
+/**
+ * getCertification — read the on-chain certification for an agent (simulate-
+ * only). Returns null when the agent has no certification record.
+ */
+export async function getCertification(agentId: Buffer): Promise<OnChainCertification | null> {
+  const s = getStellar();
+  const tx = (await s.buildTx(s.platformKeypair.publicKey()))
+    .addOperation(
+      new Contract(s.contracts.agentRegistry).call(
+        'get_certification',
+        nativeToScVal(agentId, { type: 'bytes' }),
+      ),
+    )
+    .build();
+  const sim = await s.rpc.simulateTransaction(tx);
+  if ('error' in sim && sim.error) return null;
+  const ret = ('result' in sim && sim.result?.retval) || null;
+  if (!ret) return null;
+  const decoded = scValToNative(ret) as Record<string, unknown> | null;
+  if (!decoded) return null; // Option::None → null
+  return {
+    agent_id: toHex(decoded.agent_id),
+    score_bps: Number(decoded.score_bps ?? 0),
+    cert_hash: toHex(decoded.cert_hash),
+    version: Number(decoded.version ?? 0),
+    certified_at: Number(decoded.certified_at ?? 0),
+    expires_at: Number(decoded.expires_at ?? 0),
+    status: String(decoded.status ?? ''),
+  };
+}
+
+/**
+ * submitRegisterAgent — platform-signed on-chain registration. `register_agent`
+ * is platform-registrar (no seller auth), so the platform relayer can mint an
+ * on-chain identity for an agent that reached certification without one. Returns
+ * the created 32-byte agent id (hex) + tx hash.
+ */
+export async function submitRegisterAgent(input: {
+  seller: string;
+  slug: string;
+  displayName: string;
+  priceStroops: bigint;
+  manifestHashHex: string;
+  kyaRequired: boolean;
+}): Promise<{ hash: string; agentIdHex: string }> {
+  const s = getStellar();
+  const manifest = Buffer.from(input.manifestHashHex.replace(/^0x/, ''), 'hex');
+  const tx = (await s.buildTx(s.platformKeypair.publicKey()))
+    .addOperation(
+      new Contract(s.contracts.agentRegistry).call(
+        'register_agent',
+        new Address(input.seller).toScVal(),
+        nativeToScVal(input.slug, { type: 'string' }),
+        nativeToScVal(input.displayName, { type: 'string' }),
+        nativeToScVal(input.priceStroops, { type: 'i128' }),
+        nativeToScVal(manifest, { type: 'bytes' }),
+        nativeToScVal(input.kyaRequired, { type: 'bool' }),
+      ),
+    )
+    .build();
+  const prepared = await s.rpc.prepareTransaction(tx);
+  prepared.sign(s.platformKeypair);
+  const result = await s.submitPlatformSigned(prepared);
+  const agentIdHex = result.returnValue ? toHex(scValToNative(result.returnValue)) : '';
+  return { hash: result.hash, agentIdHex };
+}
+
+/** revoke_certification (platform-signed). `toLegacy=true` downgrades; else revokes. */
+export async function submitRevokeCertification(
+  agentIdHex: string,
+  toLegacy: boolean,
+): Promise<{ hash: string }> {
+  const s = getStellar();
+  const agentId = Buffer.from(agentIdHex.replace(/^0x/, ''), 'hex');
+  const tx = (await s.buildTx(s.platformKeypair.publicKey()))
+    .addOperation(
+      new Contract(s.contracts.agentRegistry).call(
+        'revoke_certification',
+        nativeToScVal(agentId, { type: 'bytes' }),
+        xdr.ScVal.scvBool(toLegacy),
+      ),
+    )
+    .build();
+  const prepared = await s.rpc.prepareTransaction(tx);
+  prepared.sign(s.platformKeypair);
+  const result = await s.submitPlatformSigned(prepared);
+  return { hash: result.hash };
+}
+
 // ── Build XDRs (caller signs + submits via SDK payRouter) ────────────────────
 
 export async function buildHireAgentXdr(
@@ -238,6 +374,13 @@ export async function buildPlatformRelayHireXdr(
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
+
+/** Decode a ScVal-native bytes value (Uint8Array/Buffer/hex-ish) to hex. */
+function toHex(v: unknown): string {
+  if (v instanceof Uint8Array) return Buffer.from(v).toString('hex');
+  if (Buffer.isBuffer(v)) return v.toString('hex');
+  return String(v ?? '');
+}
 
 function mapAgent(agentId: Buffer, m: Record<string, unknown>, _i = 0): AgentSummary {
   return {
