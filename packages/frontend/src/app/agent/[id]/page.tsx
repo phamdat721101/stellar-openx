@@ -97,10 +97,33 @@ export default function AgentDetailPage() {
     }
   }, [id]);
 
+  // Single source of truth for "in-flight call" state. Every call site that
+  // used to scatter `setAnswer(null)` / `setErr(null)` ad hoc now goes
+  // through here, so a stale RESULT from a previous hire can never survive
+  // a new question or an agent switch (bug: RESULT block stuck showing an
+  // old answer after the buyer moves on).
+  const resetCallState = useCallback(() => {
+    setAnswer(null);
+    setErr(null);
+    setEscrowDone(null);
+  }, []);
+
+  // Auto-dismiss a completed RESULT after a short grace period instead of
+  // leaving it as a permanent fixture on the page. Escrow is excluded — its
+  // result must stay visible until the buyer approves/disputes/claims.
+  const RESULT_AUTO_CLEAR_MS = 15_000;
+  useEffect(() => {
+    if (!answer || mode === 'escrow') return;
+    const t = setTimeout(() => setAnswer(null), RESULT_AUTO_CLEAR_MS);
+    return () => clearTimeout(t);
+  }, [answer, mode]);
+
   useEffect(() => {
     setLoading(true);
+    resetCallState();
+    setQuestion('');
     void refresh().finally(() => setLoading(false));
-  }, [refresh]);
+  }, [refresh, resetCallState]);
 
   const hire = async () => {
     if (!agent) return;
@@ -123,7 +146,7 @@ export default function AgentDetailPage() {
     if (selectedVaultId) {
       const vault = budget.vaults.find((v) => v.id === selectedVaultId);
       if (!vault) { setErr('Selected vault not found — pick another or refresh'); return; }
-      setBusy(true); setErr(null); setAnswer(null);
+      setBusy(true); resetCallState();
       try {
         const r = await fetch(`${API_URL}/api/v1/${agent.slug}`, {
           method: 'POST',
@@ -149,8 +172,7 @@ export default function AgentDetailPage() {
       return;
     }
     setBusy(true);
-    setErr(null);
-    setAnswer(null);
+    resetCallState();
     try {
       // 1. First call — expect a 402 challenge. (v3.1 removed the
       //    "demo bypass" that used to return 200 + a free answer when the
@@ -287,9 +309,7 @@ export default function AgentDetailPage() {
   const hireEscrow = async () => {
     if (!agent) return;
     setBusy(true);
-    setAnswer(null);
-    setEscrowDone(null);
-    setErr(null);
+    resetCallState();
     try {
       // 1. Deploy escrow (buyer sign #1) — server pre-builds via TW deploy.
       setErr('Step 1/4 · Deploying escrow contract… sign in wallet');
@@ -481,7 +501,13 @@ export default function AgentDetailPage() {
             )}
             <textarea
               value={question}
-              onChange={(e) => setQuestion(e.target.value)}
+              onChange={(e) => {
+                setQuestion(e.target.value);
+                // A previous RESULT/error belongs to the previous question —
+                // clear it the moment the buyer starts editing, instead of
+                // leaving it stuck on screen until the next hire resolves.
+                if (answer || err) resetCallState();
+              }}
               rows={4}
               placeholder="What do you want this agent to do?"
               className="w-full rounded-lg border border-outline-variant/40 bg-background p-3 text-sm focus:border-primary-container focus:outline-none"
@@ -520,7 +546,17 @@ export default function AgentDetailPage() {
             </div>
             {answer && (
               <article className="rounded-lg border border-outline-variant/40 bg-background p-4">
-                <h3 className="mb-2 text-xs font-semibold uppercase text-primary-container">Result</h3>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-xs font-semibold uppercase text-primary-container">Result</h3>
+                  {mode !== 'escrow' && (
+                    <button
+                      onClick={() => { resetCallState(); setQuestion(''); }}
+                      className="text-[11px] text-on-surface-variant hover:text-on-surface hover:underline"
+                    >
+                      Ask another question
+                    </button>
+                  )}
+                </div>
                 <pre className="whitespace-pre-wrap font-mono text-sm text-on-surface">{answer}</pre>
                 {mode === 'escrow' && escrowAddr && !escrowDone && (
                   <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-outline-variant/40 pt-3">
