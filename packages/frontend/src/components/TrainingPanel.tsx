@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useStellarWallet } from '@/hooks/useStellarWallet';
-import { API_URL } from '@/lib/stellar';
+import { API_URL, stellarExplorerTxUrl } from '@/lib/stellar';
 
 const STAGES = ['onboarded', 'learning', 'skilling', 'evaluating', 'certified'] as const;
 const STAGE_LABEL: Record<string, string> = {
@@ -100,6 +100,8 @@ export function TrainingPanel({ agentId }: { agentId: string }) {
 
   const curIdx = STAGES.indexOf(state.stage === 'legacy_certified' ? 'certified' : (state.stage as (typeof STAGES)[number]));
   const lastEval = state.events.find((e) => e.event_type === 'eval');
+  const lastCertify = state.events.find((e) => e.event_type === 'certify');
+  const certTxUrl = stellarExplorerTxUrl(lastCertify?.detail?.tx_hash as string | null | undefined);
   const proposals = state.events.filter((e) => e.event_type === 'dgm_proposal' && e.detail?.status === 'pending');
 
   return (
@@ -167,16 +169,63 @@ export function TrainingPanel({ agentId }: { agentId: string }) {
           </div>
         )}
         {(state.stage === 'certified' || state.stage === 'legacy_certified') && (
-          <div className="rounded-lg border border-primary-container/40 bg-primary-container/10 p-3 text-xs">
-            <p className="font-medium text-primary-container">
-              {state.stage === 'certified' ? '✓ Certified Stellar Agent' : 'Legacy Certified'}
-              {state.cert_score != null && ` · score ${(state.cert_score * 100).toFixed(0)}%`}
-            </p>
-            {state.certificate_hash && (
-              <p className="mt-1 break-all font-mono text-[10px] text-on-surface-variant/80">
-                {state.certificate_hash}
+          <div className="space-y-3">
+            <div className="rounded-lg border border-primary-container/40 bg-primary-container/10 p-3 text-xs">
+              <p className="font-medium text-primary-container">
+                {state.stage === 'certified' ? '✓ Certified Stellar Agent' : 'Legacy Certified'}
+                {state.cert_score != null && ` · score ${(state.cert_score * 100).toFixed(0)}%`}
               </p>
-            )}
+              {state.certificate_hash && (
+                <p className="mt-1 break-all font-mono text-[10px] text-on-surface-variant/80">
+                  {state.certificate_hash}
+                </p>
+              )}
+              {certTxUrl ? (
+                <a
+                  href={certTxUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="mt-2 inline-block text-[11px] text-primary-container hover:underline"
+                >
+                  View proof on Stellar Expert ↗
+                </a>
+              ) : (
+                <div className="mt-2 space-y-1.5">
+                  <p className="text-[11px] text-on-surface-variant/70">
+                    On-chain attestation pending — the off-chain certificate above is still verifiable via
+                    `certificate_hash`.
+                    {typeof lastCertify?.detail?.on_chain_error === 'string' &&
+                      ` (${lastCertify.detail.on_chain_error})`}
+                  </p>
+                  {state.stage === 'certified' && (
+                    <ActionButton
+                      label="Retry on-chain attestation"
+                      busy={busy === 'certify'}
+                      onClick={() => act('certify', { auto_publish: autoPublish })}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Post-certification continuous learning — layer in new skills
+                without leaving the certified stage (skillService treats this
+                as additive, not a stage regression). */}
+            <div className="space-y-2">
+              <h3 className="font-mono text-[10px] uppercase text-on-surface-variant">Learn a new skill</h3>
+              <textarea
+                value={skillMd}
+                onChange={(e) => setSkillMd(e.target.value)}
+                rows={4}
+                placeholder="Paste a SKILL.md (optional — leave empty to auto-generate from a Raven playbook)"
+                className="w-full rounded-lg border border-outline-variant/40 bg-background p-3 text-xs"
+              />
+              <ActionButton
+                label="Acquire skill"
+                busy={busy === 'skills'}
+                onClick={() => act('skills', skillMd.trim() ? { skill_md: skillMd } : {})}
+              />
+            </div>
           </div>
         )}
       </div>

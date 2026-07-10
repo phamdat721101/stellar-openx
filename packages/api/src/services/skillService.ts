@@ -49,9 +49,15 @@ class SkillService implements ISkillService {
     input: { skill_md?: string; playbook_query?: string },
   ): Promise<TrainingState> {
     const agent = await requireOwnedAgent(agentId, owner);
-    if (stageAtLeast(agent.training_stage, 'skilling')) return trainingService.getState(agentId);
-    if (agent.training_stage !== 'learning') {
-      throw new Error('stage_precondition: complete "learning" before acquiring skills');
+    const alreadyCertified = agent.training_stage === 'certified' || agent.training_stage === 'legacy_certified';
+    // A certified agent may keep layering in new skills post-certification —
+    // this is additive learning, not a stage regression, so it skips the
+    // normal "must be in learning" gate and never rewinds training_stage.
+    if (!alreadyCertified) {
+      if (stageAtLeast(agent.training_stage, 'skilling')) return trainingService.getState(agentId);
+      if (agent.training_stage !== 'learning') {
+        throw new Error('stage_precondition: complete "learning" before acquiring skills');
+      }
     }
 
     // Resolve the skill markdown — uploaded, or auto-generated from a playbook.
@@ -72,13 +78,13 @@ class SkillService implements ISkillService {
     }
     await recordTrainingEvent({
       agentId,
-      stage: 'skilling',
+      stage: alreadyCertified ? agent.training_stage : 'skilling',
       eventType: 'skill_audit',
       passed,
       score,
       detail: { threshold: AUDIT_THRESHOLD, audit, source: input.skill_md ? 'upload' : 'raven_autogen' },
     });
-    if (passed) await setTrainingStage(agentId, 'skilling');
+    if (passed && !alreadyCertified) await setTrainingStage(agentId, 'skilling');
     return trainingService.getState(agentId);
   }
 
