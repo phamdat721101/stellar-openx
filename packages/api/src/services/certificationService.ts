@@ -27,6 +27,7 @@ import {
   submitRegisterAgent,
   submitRevokeCertification,
   getCertification,
+  getAgent,
 } from './stellar/marketplace';
 import {
   recordTrainingEvent,
@@ -62,8 +63,14 @@ class CertificationService implements ICertificationService {
     opts: { auto_publish?: boolean } = {},
   ): Promise<TrainingState> {
     const agent = await requireOwnedAgent(agentId, owner);
-    if (agent.training_stage === 'certified') return trainingService.getState(agentId);
-    if (agent.training_stage !== 'evaluating') {
+    // Allow retrying an already-issued certificate when its on-chain proof
+    // never landed (tx_hash null) — otherwise a stale/orphaned
+    // soroban_agent_id (e.g. after a contract redeploy) leaves the agent
+    // stuck "pending" forever with no way to self-heal.
+    if (agent.training_stage === 'certified' && (await this.hasOnChainProof(agentId))) {
+      return trainingService.getState(agentId);
+    }
+    if (agent.training_stage !== 'evaluating' && agent.training_stage !== 'certified') {
       throw new Error('stage_precondition: agent must pass evaluation before certification');
     }
 
@@ -76,9 +83,17 @@ class CertificationService implements ICertificationService {
     // Ensure the agent has an on-chain identity, then attest on-chain. The whole
     // block is best-effort: if the network is unreachable the credential still
     // issues off-chain (txHash/onChain null) so certification never hard-blocks.
+    //
+    // A cached soroban_agent_id can go stale (e.g. the registry contract was
+    // redeployed and its storage reset) — verify it still resolves on-chain
+    // before trusting it, otherwise every certify_agent call traps NotFound
+    // against a dead id forever. Re-register when stale or absent.
     let txHash: string | null = null;
-    let onChainAgentId = row.soroban_agent_id;
+    let onChainAgentId = row.soroban_agent_id && (await getAgent(hexToBuf(row.soroban_agent_id)))
+      ? row.soroban_agent_id
+      : null;
     let onChainVerified = false;
+    let onChainError: string | null = null;
     try {
       if (!onChainAgentId) {
         onChainAgentId = await this.ensureOnChainRegistration(row);
@@ -91,7 +106,8 @@ class CertificationService implements ICertificationService {
         onChainVerified = chain?.status === 'certified' && chain.version === version;
       }
     } catch (err) {
-      logger.warn({ err: (err as Error).message, agentId }, 'cert:onchain:failed_offchain_only');
+      onChainError = (err as Error).message;
+      logger.warn({ err: onChainError, agentId }, 'cert:onchain:failed_offchain_only');
     }
 
     const expiresAt = new Date(Date.now() + RECERT_DAYS * 86_400_000);
@@ -119,6 +135,7 @@ class CertificationService implements ICertificationService {
         tx_hash: txHash,
         on_chain_agent_id: onChainAgentId,
         on_chain_verified: onChainVerified,
+        on_chain_error: onChainError,
         network: NETWORK_TAG,
       },
     });
@@ -196,6 +213,19 @@ class CertificationService implements ICertificationService {
     }
   }
 
+  /** True when the most recent `certify` event actually landed on-chain
+   *  (tx_hash present) — used to decide whether re-issuing certify() should
+   *  be a no-op or a genuine retry. */
+  private async hasOnChainProof(agentId: string): Promise<boolean> {
+    const r = await pool.query<{ tx_hash: string | null }>(
+      `SELECT detail->>'tx_hash' AS tx_hash FROM agent_training_events
+        WHERE agent_id = $1 AND event_type = 'certify'
+        ORDER BY created_at DESC LIMIT 1`,
+      [agentId],
+    );
+    return Boolean(r.rows[0]?.tx_hash);
+  }
+
   /** Mint an on-chain identity for an agent that reached certification without
    *  one (platform-registrar). Persists the new id back to the DB. Returns the
    *  32-byte hex id, or null if registration didn't yield one. */
@@ -254,6 +284,10 @@ function canonicalCertHash(input: {
     kind: 'stellar-agent-certification',
   });
   return '0x' + createHash('sha256').update(canonical).digest('hex');
+}
+
+function hexToBuf(hex: string): Buffer {
+  return Buffer.from(hex.replace(/^0x/, ''), 'hex');
 }
 
 function clamp01(n: number): number {
